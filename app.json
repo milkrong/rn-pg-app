@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "Nurture",
+    "slug": "fertility-coach-ios",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "nurture",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.example.nurture.fertilitycoach",
+      "infoPlist": {
+        "NSHealthShareUsageDescription": "Nurture reads menstrual flow, ovulation test, and basal body temperature data to help you understand fertility patterns.",
+        "NSHealthUpdateUsageDescription": "Nurture writes cycle logs you explicitly record so your Apple Health data stays in sync."
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "2c49438f-1a69-4b8d-9b59-443050c3ea64"
+      }
+    },
+    "android": {
+      "package": "com.example.nurture.fertilitycoach"
+    }
+  }
+}
