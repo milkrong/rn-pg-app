@@ -1,11 +1,19 @@
 import { useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import type { User } from "@supabase/supabase-js";
 import { getPlanLimits } from "@/domain/entitlements";
+import { formatRenewalDate, SUBSCRIPTION_FEATURES } from "@/domain/subscription";
 import type { UserRole } from "@/domain/userRole";
 import { ROLE_CONTENT } from "@/domain/userRole";
 import { formatAuthError, getAuthSnapshot, signInWithEmail, signOut, signUpWithEmail, subscribeToAuthChanges } from "@/services/auth";
 import { getAiUsageToday, getEntitlement } from "@/services/cloudSync";
+import {
+  getSubscriptionState,
+  purchasePro,
+  refreshSubscriptionFromCloud,
+  restorePurchases,
+  type SubscriptionState
+} from "@/services/revenueCat";
 import { getUserRole, saveUserRole, subscribeUserRole } from "@/services/userRolePreference";
 import { Screen } from "@/ui/Screen";
 import { colors, radius, spacing, typography } from "@/ui/tokens";
@@ -22,6 +30,8 @@ export default function ProfileScreen() {
   const [error, setError] = useState<string | null>(null);
   const [plan, setPlan] = useState<"free" | "pro">("free");
   const [aiUsage, setAiUsage] = useState(0);
+  const [subscription, setSubscription] = useState<SubscriptionState | null>(null);
+  const [isSubscriptionBusy, setIsSubscriptionBusy] = useState(false);
   const [cloudSyncEnabled, setCloudSyncEnabled] = useState(true);
   const [aiContextEnabled, setAiContextEnabled] = useState(true);
   const [healthWriteEnabled, setHealthWriteEnabled] = useState(false);
@@ -74,19 +84,21 @@ export default function ProfileScreen() {
     if (!user) {
       setPlan("free");
       setAiUsage(0);
+      setSubscription(null);
       return;
     }
 
     let isMounted = true;
 
-    Promise.all([getEntitlement(), getAiUsageToday()])
-      .then(([entitlement, usage]) => {
+    Promise.all([getEntitlement(), getAiUsageToday(), getSubscriptionState()])
+      .then(([entitlement, usage, subscriptionState]) => {
         if (!isMounted) {
           return;
         }
 
-        setPlan(entitlement.plan);
+        setPlan(subscriptionState.plan ?? entitlement.plan);
         setAiUsage(usage);
+        setSubscription(subscriptionState);
       })
       .catch(() => {
         if (isMounted) {
@@ -141,6 +153,49 @@ export default function ProfileScreen() {
   async function chooseRole(nextRole: UserRole) {
     setRole(nextRole);
     await saveUserRole(nextRole);
+  }
+
+  async function handleSubscriptionAction(action: "purchase" | "restore" | "refresh") {
+    if (!user) {
+      setError("请先登录，再管理订阅。");
+      return;
+    }
+
+    setIsSubscriptionBusy(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const nextSubscription =
+        action === "purchase"
+          ? await purchasePro()
+          : action === "restore"
+            ? await restorePurchases()
+            : await refreshSubscriptionFromCloud();
+
+      setSubscription(nextSubscription);
+      setPlan(nextSubscription.plan);
+      setMessage(
+        action === "purchase"
+          ? "购买完成，订阅状态已刷新。"
+          : action === "restore"
+            ? "恢复购买完成。若刚完成支付，RevenueCat webhook 可能需要几秒同步。"
+            : "订阅状态已刷新。"
+      );
+    } catch (subscriptionError) {
+      setError(subscriptionError instanceof Error ? subscriptionError.message : "订阅操作失败。");
+    } finally {
+      setIsSubscriptionBusy(false);
+    }
+  }
+
+  async function openSubscriptionManagement() {
+    if (!subscription?.managementUrl) {
+      setError("当前没有可打开的订阅管理链接。");
+      return;
+    }
+
+    await Linking.openURL(subscription.managementUrl);
   }
 
   return (
@@ -203,11 +258,68 @@ export default function ProfileScreen() {
         ) : null}
 
         <View style={styles.plan}>
-          <Text style={styles.planTitle}>{plan === "pro" ? "Nurture Pro" : "Nurture Free"}</Text>
+          <View style={styles.planHeader}>
+            <View>
+              <Text style={styles.planEyebrow}>当前套餐</Text>
+              <Text style={styles.planTitle}>{plan === "pro" ? "Nurture Pro" : "Nurture Free"}</Text>
+            </View>
+            <View style={styles.planBadge}>
+              <Text style={styles.planBadgeText}>{plan === "pro" ? "PRO" : "FREE"}</Text>
+            </View>
+          </View>
           <Text style={styles.planBody}>
-            当前每日 AI 用量 {aiUsage}/{getPlanLimits(plan).dailyAiMessages}。Pro 支持每日 {proLimits.dailyAiMessages} 次 AI 问答、云同步、深度趋势报告和完整 HealthKit 同步。
+            今日 AI 用量 {aiUsage}/{getPlanLimits(plan).dailyAiMessages}。Pro 解锁每日 {proLimits.dailyAiMessages} 次 AI 问答、云同步和深度趋势报告。
           </Text>
-          <Text style={styles.planAction}>管理订阅 / 恢复购买</Text>
+          <View style={styles.featureList}>
+            {SUBSCRIPTION_FEATURES.map((feature) => {
+              const included = feature.includedIn.includes(plan);
+              return (
+                <View key={feature.label} style={styles.featureRow}>
+                  <Text style={[styles.featureMark, included && styles.featureMarkActive]}>{included ? "✓" : "+"}</Text>
+                  <Text style={styles.featureText}>{feature.label}</Text>
+                </View>
+              );
+            })}
+          </View>
+          <View style={styles.subscriptionMeta}>
+            <Text style={styles.subscriptionMetaText}>
+              {subscription?.package?.price ? `可选套餐 ${subscription.package.price}` : "RevenueCat offering 尚未返回价格"}
+            </Text>
+            <Text style={styles.subscriptionMetaText}>
+              {plan === "pro" ? `有效期至 ${formatRenewalDate(subscription?.renewalDate)}` : "升级后通过 RevenueCat webhook 同步 Pro 状态"}
+            </Text>
+          </View>
+          <View style={styles.subscriptionActions}>
+            <Pressable
+              disabled={!user || isSubscriptionBusy || plan === "pro"}
+              onPress={() => handleSubscriptionAction("purchase")}
+              style={[styles.planPrimaryButton, (!user || isSubscriptionBusy || plan === "pro") && styles.disabledButton]}
+            >
+              <Text style={styles.planPrimaryButtonText}>
+                {plan === "pro" ? "已开通 Pro" : isSubscriptionBusy ? "处理中" : "升级 Pro"}
+              </Text>
+            </Pressable>
+            <Pressable
+              disabled={!user || isSubscriptionBusy}
+              onPress={() => handleSubscriptionAction("restore")}
+              style={[styles.planSecondaryButton, (!user || isSubscriptionBusy) && styles.disabledButton]}
+            >
+              <Text style={styles.planSecondaryButtonText}>恢复购买</Text>
+            </Pressable>
+          </View>
+          <View style={styles.subscriptionFooter}>
+            <Pressable disabled={!user || isSubscriptionBusy} onPress={() => handleSubscriptionAction("refresh")}>
+              <Text style={styles.planAction}>刷新状态</Text>
+            </Pressable>
+            {subscription?.managementUrl ? (
+              <Pressable onPress={openSubscriptionManagement}>
+                <Text style={styles.planAction}>管理订阅</Text>
+              </Pressable>
+            ) : null}
+          </View>
+          {!subscription?.canPurchase ? (
+            <Text style={styles.subscriptionHint}>请配置 RevenueCat 公钥后再测试真实购买。Expo Go 不支持原生购买，需要 dev build。</Text>
+          ) : null}
         </View>
 
         <View style={styles.roleCard}>
@@ -395,24 +507,123 @@ const styles = StyleSheet.create({
   plan: {
     backgroundColor: colors.ink,
     borderRadius: radius.md,
+    gap: spacing.md,
     marginBottom: spacing.lg,
     padding: spacing.lg
+  },
+  planHeader: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: spacing.md
+  },
+  planEyebrow: {
+    color: colors.blush,
+    fontSize: 12,
+    fontWeight: "900",
+    letterSpacing: 0,
+    marginBottom: 4
   },
   planTitle: {
     color: colors.surface,
     fontSize: 22,
-    fontWeight: "900",
-    marginBottom: 10
+    fontWeight: "900"
+  },
+  planBadge: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6
+  },
+  planBadgeText: {
+    color: colors.ink,
+    fontSize: 12,
+    fontWeight: "900"
   },
   planBody: {
     ...typography.body,
+    color: colors.blush
+  },
+  featureList: {
+    gap: spacing.sm
+  },
+  featureRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing.sm
+  },
+  featureMark: {
     color: colors.blush,
-    marginBottom: spacing.md
+    fontSize: 15,
+    fontWeight: "900",
+    width: 18
+  },
+  featureMarkActive: {
+    color: colors.surface
+  },
+  featureText: {
+    color: colors.surface,
+    flex: 1,
+    fontSize: 14,
+    fontWeight: "800"
+  },
+  subscriptionMeta: {
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: radius.sm,
+    gap: 6,
+    padding: spacing.sm
+  },
+  subscriptionMetaText: {
+    color: colors.blush,
+    fontSize: 13,
+    lineHeight: 19
+  },
+  subscriptionActions: {
+    flexDirection: "row",
+    gap: spacing.sm
+  },
+  planPrimaryButton: {
+    alignItems: "center",
+    backgroundColor: colors.coral,
+    borderRadius: radius.sm,
+    flex: 1,
+    padding: spacing.md
+  },
+  planPrimaryButtonText: {
+    color: colors.surface,
+    fontSize: 15,
+    fontWeight: "900"
+  },
+  planSecondaryButton: {
+    alignItems: "center",
+    borderColor: "rgba(255,255,255,0.28)",
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    flex: 1,
+    padding: spacing.md
+  },
+  planSecondaryButtonText: {
+    color: colors.surface,
+    fontSize: 15,
+    fontWeight: "900"
+  },
+  disabledButton: {
+    opacity: 0.48
+  },
+  subscriptionFooter: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.md
   },
   planAction: {
     color: colors.surface,
     fontSize: 15,
     fontWeight: "900"
+  },
+  subscriptionHint: {
+    color: colors.blush,
+    fontSize: 13,
+    lineHeight: 19
   },
   row: {
     alignItems: "center",

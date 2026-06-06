@@ -1,18 +1,19 @@
 import { Ionicons } from "@expo/vector-icons";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text } from "react-native";
 import { colors, radius, spacing } from "./tokens";
 
 type Props = {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
+  onPress?: () => void;
 };
 
-export function QuickLogButton({ icon, label }: Props) {
+export function QuickLogButton({ icon, label, onPress }: Props) {
   return (
-    <View style={styles.button}>
+    <Pressable style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]} onPress={onPress}>
       <Ionicons name={icon} color={colors.coral} size={22} />
       <Text style={styles.label}>{label}</Text>
-    </View>
+    </Pressable>
   );
 }
 
@@ -29,9 +30,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: spacing.sm
   },
+  buttonPressed: {
+    borderColor: colors.coral,
+    transform: [{ scale: 0.98 }]
+  },
   label: {
     color: colors.text,
     fontSize: 12,
-    fontWeight: "800"
+    fontWeight: "800",
+    lineHeight: 16,
+    textAlign: "center"
   }
 });

@@ -28,7 +28,10 @@
       }
     },
     "android": {
-      "package": "com.example.nurture.fertilitycoach"
+      "package": "com.example.nurture.fertilitycoach",
+      "permissions": [
+        "com.android.vending.BILLING"
+      ]
     }
   }
 }

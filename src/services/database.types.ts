@@ -194,6 +194,39 @@ export type Database = {
         };
         Relationships: [];
       };
+      subscription_events: {
+        Row: {
+          entitlement_ids: string[];
+          event_type: string;
+          id: string;
+          payload: Json;
+          product_id: string | null;
+          received_at: string;
+          revenuecat_customer_id: string;
+          user_id: string | null;
+        };
+        Insert: {
+          entitlement_ids?: string[];
+          event_type: string;
+          id: string;
+          payload: Json;
+          product_id?: string | null;
+          received_at?: string;
+          revenuecat_customer_id: string;
+          user_id?: string | null;
+        };
+        Update: {
+          entitlement_ids?: string[];
+          event_type?: string;
+          id?: string;
+          payload?: Json;
+          product_id?: string | null;
+          received_at?: string;
+          revenuecat_customer_id?: string;
+          user_id?: string | null;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

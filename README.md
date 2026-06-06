@@ -8,7 +8,7 @@ iOS-first React Native app for menstrual and fertility management. The MVP focus
 - Expo Router tab navigation
 - Supabase Auth/Postgres/RLS/Edge Functions
 - OpenRouter Chat Completions through Supabase Edge Functions
-- RevenueCat-ready subscription boundary
+- RevenueCat subscriptions with Supabase entitlement sync
 - HealthKit service boundary for menstrual flow, basal body temperature, and ovulation tests
 
 ## Run
@@ -26,9 +26,18 @@ For iOS native modules, use a custom dev client:
 pnpm ios
 ```
 
+RevenueCat purchases require a dev client or store build. Expo Go cannot load the native purchases module.
+
 ## Environment
 
 Copy `.env.example` to `.env` and set Supabase values. `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, and `REVENUECAT_WEBHOOK_SECRET` are server-side only and belong in Supabase Edge Function secrets.
+
+RevenueCat setup:
+
+- Set `EXPO_PUBLIC_REVENUECAT_IOS_API_KEY` and/or `EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY` for client purchases.
+- Set Supabase secret `REVENUECAT_WEBHOOK_SECRET` to the exact Authorization value configured in RevenueCat.
+- Configure RevenueCat entitlement id `pro` and send webhooks to `https://vyjryphiugsfslvorgoc.supabase.co/functions/v1/revenuecat-webhook`.
+- The webhook is deployed with JWT verification disabled and validates the RevenueCat Authorization header itself.
 
 ## Product Boundaries
 
