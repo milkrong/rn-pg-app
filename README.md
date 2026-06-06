@@ -7,7 +7,7 @@ iOS-first React Native app for menstrual and fertility management. The MVP focus
 - Expo 53 + React Native 0.79 + TypeScript
 - Expo Router tab navigation
 - Supabase Auth/Postgres/RLS/Edge Functions
-- OpenAI Responses API through Supabase Edge Functions
+- OpenRouter Chat Completions through Supabase Edge Functions
 - RevenueCat-ready subscription boundary
 - HealthKit service boundary for menstrual flow, basal body temperature, and ovulation tests
 
@@ -28,7 +28,7 @@ pnpm ios
 
 ## Environment
 
-Copy `.env.example` to `.env` and set Supabase values. `OPENAI_API_KEY` and `REVENUECAT_WEBHOOK_SECRET` are server-side only and belong in Supabase Edge Function secrets.
+Copy `.env.example` to `.env` and set Supabase values. `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, and `REVENUECAT_WEBHOOK_SECRET` are server-side only and belong in Supabase Edge Function secrets.
 
 ## Product Boundaries
 

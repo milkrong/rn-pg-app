@@ -1,30 +1,66 @@
+import { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
+import type { UserRole } from "@/domain/userRole";
+import { getRoleContent } from "@/domain/userRole";
 import { demoCalendarDays } from "@/fixtures/demoData";
+import { getUserRole, subscribeUserRole } from "@/services/userRolePreference";
 import { Screen } from "@/ui/Screen";
 import { colors, radius, spacing, typography } from "@/ui/tokens";
 
 export default function CycleScreen() {
+  const [role, setRole] = useState<UserRole | null>("female");
+  const content = getRoleContent(role) ?? getRoleContent("female");
+
+  useEffect(() => {
+    let isMounted = true;
+
+    getUserRole().then((storedRole) => {
+      if (isMounted && storedRole) {
+        setRole(storedRole);
+      }
+    });
+
+    const unsubscribe = subscribeUserRole((nextRole) => {
+      if (nextRole) {
+        setRole(nextRole);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, []);
+
   return (
-    <Screen title="周期记录">
+    <Screen title={content?.cycleTitle}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-        <View style={styles.calendar}>
-          {demoCalendarDays.map((day) => (
-            <View key={day.date} style={[styles.day, day.kind === "fertile" && styles.fertileDay, day.kind === "period" && styles.periodDay]}>
-              <Text style={[styles.dayText, day.kind !== "normal" && styles.activeDayText]}>{day.label}</Text>
-              <Text style={styles.dayMeta}>{day.meta}</Text>
-            </View>
-          ))}
-        </View>
+        {role === "female" ? (
+          <View style={styles.calendar}>
+            {demoCalendarDays.map((day) => (
+              <View key={day.date} style={[styles.day, day.kind === "fertile" && styles.fertileDay, day.kind === "period" && styles.periodDay]}>
+                <Text style={[styles.dayText, day.kind !== "normal" && styles.activeDayText]}>{day.label}</Text>
+                <Text style={styles.dayMeta}>{day.meta}</Text>
+              </View>
+            ))}
+          </View>
+        ) : (
+          <View style={styles.partnerPlan}>
+            {["睡眠", "运动", "饮酒", "高温", "同房", "压力"].map((item, index) => (
+              <View key={item} style={[styles.partnerItem, index === 4 && styles.partnerItemActive]}>
+                <Text style={[styles.partnerItemText, index === 4 && styles.partnerItemTextActive]}>{item}</Text>
+              </View>
+            ))}
+          </View>
+        )}
 
         <View style={styles.panel}>
-          <Text style={styles.panelTitle}>HealthKit 同步</Text>
-          <Text style={styles.panelBody}>
-            读取并写入经期、基础体温和排卵测试结果。所有同步都需要你在 iOS 权限弹窗中明确授权。
-          </Text>
+          <Text style={styles.panelTitle}>{content?.cyclePanelTitle}</Text>
+          <Text style={styles.panelBody}>{content?.cyclePanelBody}</Text>
         </View>
 
         <View style={styles.recordList}>
-          {["经血量：无", "LH 试纸：待记录", "基础体温：36.62°C", "症状：轻微乳房胀痛"].map((item) => (
+          {content?.cycleRecords.map((item) => (
             <View key={item} style={styles.recordRow}>
               <Text style={styles.recordText}>{item}</Text>
             </View>
@@ -106,5 +142,33 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 15,
     fontWeight: "700"
+  },
+  partnerPlan: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: spacing.lg
+  },
+  partnerItem: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    height: 62,
+    justifyContent: "center",
+    width: "31.5%"
+  },
+  partnerItemActive: {
+    backgroundColor: colors.coral,
+    borderColor: colors.coral
+  },
+  partnerItemText: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: "900"
+  },
+  partnerItemTextActive: {
+    color: colors.surface
   }
 });

@@ -1,18 +1,40 @@
+import { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
+import type { UserRole } from "@/domain/userRole";
+import { getRoleContent } from "@/domain/userRole";
+import { getUserRole, subscribeUserRole } from "@/services/userRolePreference";
 import { Screen } from "@/ui/Screen";
 import { colors, radius, spacing, typography } from "@/ui/tokens";
 
-const insights = [
-  ["排卵窗口可信度", "中等", "连续记录 2-3 个周期后会更稳定"],
-  ["黄体期估计", "13 天", "处于常见范围内"],
-  ["记录连续性", "82%", "体温记录最稳定"]
-];
-
 export default function InsightsScreen() {
+  const [role, setRole] = useState<UserRole | null>("female");
+  const content = getRoleContent(role) ?? getRoleContent("female");
+
+  useEffect(() => {
+    let isMounted = true;
+
+    getUserRole().then((storedRole) => {
+      if (isMounted && storedRole) {
+        setRole(storedRole);
+      }
+    });
+
+    const unsubscribe = subscribeUserRole((nextRole) => {
+      if (nextRole) {
+        setRole(nextRole);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, []);
+
   return (
     <Screen title="趋势洞察">
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-        {insights.map(([label, value, detail]) => (
+        {content?.insights.map(([label, value, detail]) => (
           <View key={label} style={styles.card}>
             <Text style={styles.label}>{label}</Text>
             <Text style={styles.value}>{value}</Text>
@@ -21,10 +43,8 @@ export default function InsightsScreen() {
         ))}
 
         <View style={styles.report}>
-          <Text style={styles.reportTitle}>Pro 深度报告</Text>
-          <Text style={styles.reportBody}>
-            汇总周期长度、LH 峰值、体温升高和症状变化，生成适合复盘或就医沟通的月度备孕报告。
-          </Text>
+          <Text style={styles.reportTitle}>{content?.reportTitle}</Text>
+          <Text style={styles.reportBody}>{content?.reportBody}</Text>
         </View>
       </ScrollView>
     </Screen>

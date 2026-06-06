@@ -1,71 +1,108 @@
+import { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { estimateCycle, formatCycleDayLabel, getTodayTasks } from "@/domain/cycle";
-import { demoCycleInput, demoLogs } from "@/fixtures/demoData";
+import type { UserRole } from "@/domain/userRole";
+import { getRoleContent, ROLE_CONTENT } from "@/domain/userRole";
+import { getUserRole, saveUserRole, subscribeUserRole } from "@/services/userRolePreference";
 import { ActionCard } from "@/ui/ActionCard";
 import { MetricCard } from "@/ui/MetricCard";
 import { QuickLogButton } from "@/ui/QuickLogButton";
+import { RoleGate } from "@/ui/RoleGate";
 import { Screen } from "@/ui/Screen";
 import { colors, radius, spacing, typography } from "@/ui/tokens";
 
-const estimate = estimateCycle(demoCycleInput);
-const tasks = getTodayTasks(demoCycleInput);
-
 export default function TodayScreen() {
+  const [role, setRole] = useState<UserRole | null>(null);
+  const content = getRoleContent(role);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    getUserRole().then((storedRole) => {
+      if (isMounted) {
+        setRole(storedRole);
+      }
+    });
+
+    const unsubscribe = subscribeUserRole(setRole);
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, []);
+
+  async function selectRole(nextRole: UserRole) {
+    setRole(nextRole);
+    await saveUserRole(nextRole);
+  }
+
+  if (!content) {
+    return (
+      <Screen>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+          <RoleGate onSelect={selectRole} />
+        </ScrollView>
+      </Screen>
+    );
+  }
+
   return (
     <Screen>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <View>
-            <Text style={styles.kicker}>Nurture</Text>
-            <Text style={styles.title}>今天慢慢来，也有方向</Text>
+            <Text style={styles.kicker}>{content.subtitle}</Text>
+            <Text style={styles.title}>{content.title}</Text>
           </View>
           <View style={styles.proBadge}>
-            <Text style={styles.proText}>Pro</Text>
+            <Text style={styles.proText}>{content.label}</Text>
           </View>
         </View>
 
         <LinearGradient colors={[colors.blush, colors.surface]} style={styles.hero}>
           <View style={styles.heroTop}>
-            <Text style={styles.heroLabel}>{formatCycleDayLabel(estimate.cycleDay)}</Text>
-            <Text style={styles.heroPhase}>易孕期临近</Text>
+            <Text style={styles.heroLabel}>{content.heroLabel}</Text>
+            <Text style={styles.heroPhase}>{content.heroPhase}</Text>
           </View>
-          <Text style={styles.heroTitle}>预测排卵峰值在 6月10日</Text>
-          <Text style={styles.heroBody}>
-            你的易孕窗口预计为 6月6日-6月11日。今天适合开始固定记录 LH 试纸和基础体温。
-          </Text>
+          <Text style={styles.heroTitle}>{content.heroTitle}</Text>
+          <Text style={styles.heroBody}>{content.heroBody}</Text>
           <View style={styles.timeline}>
-            {["5", "6", "7", "8", "9", "10", "11"].map((day) => (
-              <View key={day} style={[styles.timelineDot, day === "10" && styles.timelinePeak]}>
-                <Text style={[styles.timelineText, day === "10" && styles.timelinePeakText]}>{day}</Text>
+            {content.timeline.map((item) => (
+              <View key={item.label} style={[styles.timelineDot, item.isPeak && styles.timelinePeak]}>
+                <Text style={[styles.timelineText, item.isPeak && styles.timelinePeakText]}>{item.label}</Text>
               </View>
             ))}
           </View>
         </LinearGradient>
 
         <View style={styles.metrics}>
-          <MetricCard label="LH 记录" value={demoLogs.lh} detail="今日待测" tone="coral" />
-          <MetricCard label="基础体温" value={demoLogs.temperature} detail="较昨日 +0.1" tone="sage" />
+          {content.metrics.map((metric) => (
+            <MetricCard
+              key={metric.label}
+              label={metric.label}
+              value={metric.value}
+              detail={metric.detail}
+              tone={metric.tone}
+            />
+          ))}
         </View>
 
         <Text style={styles.sectionTitle}>快速记录</Text>
         <View style={styles.quickGrid}>
-          <QuickLogButton icon="water-outline" label="经期" />
-          <QuickLogButton icon="thermometer-outline" label="体温" />
-          <QuickLogButton icon="flask-outline" label="LH 试纸" />
-          <QuickLogButton icon="leaf-outline" label="症状" />
+          {content.quickLogs.map((item) => (
+            <QuickLogButton key={item.label} icon={item.icon} label={item.label} />
+          ))}
         </View>
 
-        <Text style={styles.sectionTitle}>今日备孕任务</Text>
-        {tasks.map((task) => (
+        <Text style={styles.sectionTitle}>{content.todayTitle}</Text>
+        {content.tasks.map((task) => (
           <ActionCard key={task.id} title={task.title} description={task.description} tone={task.tone} />
         ))}
 
         <View style={styles.coachCard}>
           <Text style={styles.coachTitle}>AI 备孕教练</Text>
-          <Text style={styles.coachBody}>
-            今天的重点不是做更多，而是让数据连续：LH 试纸、体温和睡眠记录会让本周期回看更可靠。
-          </Text>
+          <Text style={styles.coachBody}>{content.coachIntro}</Text>
         </View>
       </ScrollView>
     </Screen>
