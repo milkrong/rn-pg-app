@@ -139,7 +139,6 @@ export default function CoachScreen() {
   const quotaReached = answer ? answer.usage.messagesUsedToday >= answer.usage.dailyLimit : false;
 
   const quickPrompts = useMemo(() => getQuickPrompts(role), [role]);
-  const promptGroups = useMemo(() => getPromptGroups(role), [role]);
 
   function scrollToBottom(animated = true) {
     requestAnimationFrame(() => {
@@ -454,28 +453,6 @@ export default function CoachScreen() {
             </Pressable>
           )}
 
-          {!hasStarted ? (
-            <View style={styles.promptGroups}>
-              {promptGroups.map((group) => (
-                <View key={group.title} style={styles.promptGroup}>
-                  <Text style={styles.promptGroupTitle}>{group.title}</Text>
-                  <View style={styles.promptList}>
-                    {group.prompts.map((item) => (
-                      <Pressable
-                        key={item}
-                        disabled={!user || isSending}
-                        onPress={() => handlePromptChip(item)}
-                        style={[styles.promptButton, (!user || isSending) && styles.disabled]}
-                      >
-                        <Text style={styles.promptText}>{item}</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                </View>
-              ))}
-            </View>
-          ) : null}
-
           {messages.map((message, index) => {
             const isAssistant = message.role === "assistant";
             const isLastMessage = index === messages.length - 1;
@@ -589,7 +566,7 @@ export default function CoachScreen() {
             </View>
           ) : null}
 
-          {hasStarted && user ? (
+          {user ? (
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -924,37 +901,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "900",
     maxWidth: 220
-  },
-  promptGroups: {
-    gap: spacing.md,
-    marginBottom: spacing.lg
-  },
-  promptGroup: {
-    gap: 8
-  },
-  promptGroupTitle: {
-    color: colors.ink,
-    fontSize: 15,
-    fontWeight: "900"
-  },
-  promptList: {
-    gap: 8
-  },
-  promptButton: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    minHeight: 44,
-    justifyContent: "center",
-    paddingHorizontal: spacing.md,
-    paddingVertical: 10
-  },
-  promptText: {
-    color: colors.ink,
-    fontSize: 14,
-    fontWeight: "900",
-    lineHeight: 20
   },
   answerBlock: {
     backgroundColor: colors.background,
