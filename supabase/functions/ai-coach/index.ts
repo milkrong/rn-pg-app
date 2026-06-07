@@ -4,6 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 type CoachRequest = {
   question: string;
   sessionId?: string;
+  stream?: boolean;
   context: {
     cycleDay?: number;
     fertileWindow?: string;
@@ -110,6 +111,13 @@ serve(async (req) => {
     metadata: { context: body.context ?? {} }
   });
 
+  const requestBody = buildOpenRouterRequest({
+    model,
+    context,
+    question,
+    stream: Boolean(body.stream)
+  });
+
   const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -118,37 +126,7 @@ serve(async (req) => {
       "http-referer": "https://vyjryphiugsfslvorgoc.supabase.co",
       "x-title": "Nurture"
     },
-    body: JSON.stringify({
-      model,
-      messages: [
-        {
-          role: "system",
-          content:
-            "你是备孕健康管理应用的 AI 教练。提供记录、生活方式和就医沟通建议；不要诊断疾病，不要替代医生。回答必须温和、具体、非恐吓。只输出 JSON，字段必须且只能是 answer、suggestions、safety_notice。"
-        },
-        {
-          role: "user",
-          content: `授权上下文：${context || "未授权健康数据"}\n问题：${question}`
-        }
-      ],
-      response_format: {
-        type: "json_schema",
-        json_schema: {
-          name: "fertility_coach_answer",
-          strict: true,
-          schema: {
-            type: "object",
-            additionalProperties: false,
-            properties: {
-              answer: { type: "string" },
-              suggestions: { type: "array", items: { type: "string" } },
-              safety_notice: { type: "string" }
-            },
-            required: ["answer", "suggestions", "safety_notice"]
-          }
-        }
-      }
-    })
+    body: JSON.stringify(requestBody)
   });
 
   if (!response.ok) {
@@ -162,6 +140,17 @@ serve(async (req) => {
       },
       502
     );
+  }
+
+  if (body.stream) {
+    return streamCoachAnswer({
+      response,
+      supabaseAdmin,
+      userId: authData.user.id,
+      sessionId,
+      quota,
+      model
+    });
   }
 
   const payload = await response.json();
@@ -194,6 +183,148 @@ serve(async (req) => {
     200
   );
 });
+
+function buildOpenRouterRequest(input: {
+  model: string;
+  context: string;
+  question: string;
+  stream: boolean;
+}) {
+  return {
+    model: input.model,
+    stream: input.stream,
+    messages: [
+      {
+        role: "system",
+        content:
+          "你是备孕健康管理应用的 AI 教练。提供记录、生活方式和就医沟通建议；不要诊断疾病，不要替代医生。回答必须温和、具体、非恐吓。回答必须是 JSON，字段必须且只能是 answer、suggestions、safety_notice。"
+      },
+      {
+        role: "user",
+        content: `授权上下文：${input.context || "未授权健康数据"}\n问题：${input.question}`
+      }
+    ],
+    response_format: {
+      type: "json_schema",
+      json_schema: {
+        name: "fertility_coach_answer",
+        strict: true,
+        schema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            answer: { type: "string" },
+            suggestions: { type: "array", items: { type: "string" } },
+            safety_notice: { type: "string" }
+          },
+          required: ["answer", "suggestions", "safety_notice"]
+        }
+      }
+    }
+  };
+}
+
+function streamCoachAnswer(input: {
+  response: Response;
+  supabaseAdmin: ReturnType<typeof createClient>;
+  userId: string;
+  sessionId: string;
+  quota: AiMessageQuota;
+  model: string;
+}) {
+  const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
+  let rawContent = "";
+  let visibleAnswer = "";
+  let providerBuffer = "";
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      const reader = input.response.body?.getReader();
+
+      if (!reader) {
+        controller.enqueue(sse("error", { error: "AI provider did not return a stream." }));
+        controller.close();
+        return;
+      }
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            break;
+          }
+
+          providerBuffer += decoder.decode(value, { stream: true });
+          const parsed = parseOpenRouterStreamDeltas(providerBuffer);
+          providerBuffer = parsed.remaining;
+
+          for (const delta of parsed.deltas) {
+            rawContent += delta;
+            const nextVisibleAnswer = extractPartialAnswer(rawContent);
+
+            if (nextVisibleAnswer.length > visibleAnswer.length) {
+              const nextDelta = nextVisibleAnswer.slice(visibleAnswer.length);
+              visibleAnswer = nextVisibleAnswer;
+              controller.enqueue(sse("delta", { text: nextDelta }));
+            }
+          }
+        }
+
+        const answer = parseCoachAnswerFromText(rawContent);
+        const usage = await recordAiMessageUsage(input.supabaseAdmin, input.userId, input.quota);
+
+        await input.supabaseAdmin.from("coach_messages").insert({
+          user_id: input.userId,
+          session_id: input.sessionId,
+          role: "assistant",
+          content: answer.answer,
+          metadata: {
+            suggestions: answer.suggestions,
+            safety_notice: answer.safety_notice,
+            provider: "openrouter",
+            provider_response_id: null,
+            model: input.model,
+            stream: true
+          }
+        });
+
+        controller.enqueue(
+          sse("final", {
+            ...answer,
+            sessionId: input.sessionId,
+            usage: {
+              messagesUsedToday: usage.messagesUsedToday,
+              dailyLimit: usage.dailyLimit
+            }
+          })
+        );
+      } catch (error) {
+        console.error("AI coach stream failed", error);
+        controller.enqueue(
+          sse("error", {
+            error: error instanceof Error ? error.message : "AI coach stream failed"
+          })
+        );
+      } finally {
+        controller.close();
+      }
+    }
+  });
+
+  return new Response(stream, {
+    headers: {
+      ...corsHeaders,
+      "content-type": "text/event-stream; charset=utf-8",
+      "cache-control": "no-cache",
+      connection: "keep-alive"
+    }
+  });
+
+  function sse(event: string, payload: unknown): Uint8Array {
+    return encoder.encode(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`);
+  }
+}
 
 function json(payload: unknown, status = 200) {
   return new Response(JSON.stringify(payload), {
@@ -327,6 +458,83 @@ function parseCoachAnswer(payload: {
     safety_notice:
       parsed.safety_notice ?? "这些建议不能替代医生诊断；如有异常疼痛、出血或长期未孕，请咨询医生。"
   };
+}
+
+function parseCoachAnswerFromText(value: string): CoachAnswer {
+  const parsed = JSON.parse(extractJsonObject(value)) as Partial<
+    CoachAnswer & { message: string; response: string }
+  >;
+
+  return {
+    answer: parsed.answer ?? parsed.response ?? parsed.message ?? "",
+    suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions : [],
+    safety_notice:
+      parsed.safety_notice ?? "这些建议不能替代医生诊断；如有异常疼痛、出血或长期未孕，请咨询医生。"
+  };
+}
+
+function parseOpenRouterStreamDeltas(value: string): { deltas: string[]; remaining: string } {
+  const chunks = value.split("\n\n");
+  const remaining = chunks.pop() ?? "";
+  const deltas: string[] = [];
+
+  for (const chunk of chunks) {
+    for (const line of chunk.split("\n")) {
+      if (!line.startsWith("data: ")) {
+        continue;
+      }
+
+      const data = line.slice("data: ".length).trim();
+      if (!data || data === "[DONE]") {
+        continue;
+      }
+
+      try {
+        const payload = JSON.parse(data) as {
+          choices?: Array<{
+            delta?: { content?: string | Array<{ text?: string }> };
+            message?: { content?: string | Array<{ text?: string }> };
+          }>;
+        };
+        const content = payload.choices?.[0]?.delta?.content ?? payload.choices?.[0]?.message?.content;
+        const text = Array.isArray(content)
+          ? content
+              .map((item) => item.text)
+              .filter(Boolean)
+              .join("")
+          : content;
+
+        if (text) {
+          deltas.push(text);
+        }
+      } catch {
+        // Ignore malformed provider chunks; the final JSON parse will catch real failures.
+      }
+    }
+  }
+
+  return { deltas, remaining };
+}
+
+function extractPartialAnswer(value: string): string {
+  const match = value.match(/"answer"\s*:\s*"((?:\\.|[^"\\])*)/);
+  if (!match?.[1]) {
+    return "";
+  }
+
+  return unescapeJsonString(match[1]);
+}
+
+function unescapeJsonString(value: string): string {
+  try {
+    return JSON.parse(`"${value.replace(/\\$/, "")}"`) as string;
+  } catch {
+    return value
+      .replace(/\\"/g, "\"")
+      .replace(/\\n/g, "\n")
+      .replace(/\\r/g, "\r")
+      .replace(/\\t/g, "\t");
+  }
 }
 
 function extractJsonObject(value: string): string {

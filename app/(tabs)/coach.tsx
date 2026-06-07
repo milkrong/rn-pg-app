@@ -7,7 +7,7 @@ import type { UserRole } from "@/domain/userRole";
 import { getRoleContent } from "@/domain/userRole";
 import { demoCoachContext } from "@/fixtures/demoData";
 import { getAuthSnapshot, subscribeToAuthChanges } from "@/services/auth";
-import { askAiCoach, type CoachAnswer } from "@/services/aiCoach";
+import { askAiCoachStream, type CoachAnswer } from "@/services/aiCoach";
 import { getUserRole, subscribeUserRole } from "@/services/userRolePreference";
 import { Screen } from "@/ui/Screen";
 import { colors, radius, spacing, typography } from "@/ui/tokens";
@@ -38,6 +38,7 @@ export default function CoachScreen() {
   const [messages, setMessages] = useState<ChatMessage[]>([starterMessage]);
   const [answer, setAnswer] = useState<CoachAnswer | null>(null);
   const [isSending, setIsSending] = useState(false);
+  const [streamingAnswer, setStreamingAnswer] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -101,27 +102,48 @@ export default function CoachScreen() {
 
     setIsSending(true);
     setError(null);
+    setAnswer(null);
+    setStreamingAnswer("");
     setQuestion("");
+    const assistantMessageId = `assistant-${Date.now()}`;
     setMessages((current) => [
       ...current,
-      { id: `user-${Date.now()}`, role: "user", content: trimmed }
+      { id: `user-${Date.now()}`, role: "user", content: trimmed },
+      { id: assistantMessageId, role: "assistant", content: "" }
     ]);
 
     try {
       const roleContent = getRoleContent(role) ?? getRoleContent("female");
-      const result = await askAiCoach({
-        question: trimmed,
-        consent: demoCoachContext.consent,
-        cycleSummary: roleContent?.coachSummary ?? demoCoachContext.cycleSummary
-      });
+      let streamedText = "";
+      const result = await askAiCoachStream(
+        {
+          question: trimmed,
+          consent: demoCoachContext.consent,
+          cycleSummary: roleContent?.coachSummary ?? demoCoachContext.cycleSummary
+        },
+        {
+          onDelta: (text) => {
+            streamedText += text;
+            setStreamingAnswer(streamedText);
+            setMessages((current) =>
+              current.map((message) =>
+                message.id === assistantMessageId ? { ...message, content: streamedText } : message
+              )
+            );
+          }
+        }
+      );
 
       setAnswer(result);
-      setMessages((current) => [
-        ...current,
-        { id: `assistant-${Date.now()}`, role: "assistant", content: result.answer }
-      ]);
+      setStreamingAnswer(result.answer);
+      setMessages((current) =>
+        current.map((message) =>
+          message.id === assistantMessageId ? { ...message, content: result.answer } : message
+        )
+      );
     } catch (sendError) {
       setError(sendError instanceof Error ? sendError.message : "AI 教练暂时无法回复。");
+      setMessages((current) => current.filter((message) => message.id !== assistantMessageId));
     } finally {
       setIsSending(false);
     }
@@ -195,20 +217,30 @@ export default function CoachScreen() {
             ))}
           </View>
 
-          {answer ? (
+          {answer || streamingAnswer ? (
             <View style={styles.answerPanel}>
-              <Text style={styles.answerPanelTitle}>教练建议</Text>
+              <View style={styles.answerPanelHeader}>
+                <Text style={styles.answerPanelTitle}>教练建议</Text>
+                {isSending ? <Text style={styles.streamingBadge}>生成中</Text> : null}
+              </View>
               <View style={styles.answerBlock}>
                 <Text style={styles.answerBlockLabel}>一句结论</Text>
-                <Text selectable style={styles.answerMain}>{answer.answer}</Text>
+                <Text selectable style={styles.answerMain}>
+                  {streamingAnswer}
+                  {isSending ? <Text style={styles.cursor}>▋</Text> : null}
+                </Text>
               </View>
-              <StructuredAnswerSection title="今天可以做" items={answer.suggestions.slice(0, 2)} />
-              <StructuredAnswerSection title="建议记录" items={answer.suggestions.slice(2, 4)} fallback={role === "male" ? "记录同房、睡眠、饮酒和高温暴露。" : "记录 LH、基础体温、症状和同房安排。"} />
-              <StructuredAnswerSection title="需要留意" items={answer.suggestions.slice(4, 6)} fallback="如果出现明显不适、持续出血、强烈疼痛或焦虑，请咨询专业医生。" />
-              <View style={styles.answerBlock}>
-                <Text style={styles.answerBlockLabel}>安全提醒</Text>
-                <Text selectable style={styles.safetyNotice}>{answer.safety_notice}</Text>
-              </View>
+              {answer ? (
+                <>
+                  <StructuredAnswerSection title="今天可以做" items={answer.suggestions.slice(0, 2)} />
+                  <StructuredAnswerSection title="建议记录" items={answer.suggestions.slice(2, 4)} fallback={role === "male" ? "记录同房、睡眠、饮酒和高温暴露。" : "记录 LH、基础体温、症状和同房安排。"} />
+                  <StructuredAnswerSection title="需要留意" items={answer.suggestions.slice(4, 6)} fallback="如果出现明显不适、持续出血、强烈疼痛或焦虑，请咨询专业医生。" />
+                  <View style={styles.answerBlock}>
+                    <Text style={styles.answerBlockLabel}>安全提醒</Text>
+                    <Text selectable style={styles.safetyNotice}>{answer.safety_notice}</Text>
+                  </View>
+                </>
+              ) : null}
             </View>
           ) : null}
 
@@ -462,9 +494,20 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     padding: spacing.md
   },
+  answerPanelHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: spacing.sm
+  },
   answerPanelTitle: {
     color: colors.ink,
     fontSize: 17,
+    fontWeight: "900"
+  },
+  streamingBadge: {
+    color: colors.coral,
+    fontSize: 12,
     fontWeight: "900"
   },
   answerBlock: {
@@ -483,6 +526,11 @@ const styles = StyleSheet.create({
   answerMain: {
     ...typography.body,
     color: colors.ink
+  },
+  cursor: {
+    color: colors.coral,
+    fontSize: 15,
+    fontWeight: "900"
   },
   answerSuggestion: {
     ...typography.body,

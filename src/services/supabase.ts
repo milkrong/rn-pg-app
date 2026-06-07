@@ -26,3 +26,11 @@ export function requireSupabase() {
 
   return supabase;
 }
+
+export function getSupabaseFunctionUrl(functionName: string): string {
+  if (!supabaseUrl) {
+    throw new Error("Supabase is not configured. Set EXPO_PUBLIC_SUPABASE_URL.");
+  }
+
+  return `${supabaseUrl.replace(/\/$/, "")}/functions/v1/${functionName}`;
+}
