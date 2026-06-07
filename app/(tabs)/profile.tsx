@@ -87,6 +87,12 @@ export default function ProfileScreen() {
           />
           <View style={styles.divider} />
           <EntryRow
+            title="搭档绑定"
+            subtitle={user ? "邀请对方一起看周期" : "登录后才能绑定"}
+            onPress={() => router.push("/profile/partner")}
+          />
+          <View style={styles.divider} />
+          <EntryRow
             title="我的套餐"
             subtitle="升级或管理订阅"
             onPress={() => router.push("/profile/subscription")}

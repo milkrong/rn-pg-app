@@ -108,7 +108,7 @@ export const ROLE_CONTENT: Record<UserRole, RoleContent> = {
     title: "今天能帮上忙的都在这 💪",
     subtitle: "Nurture Partner",
     todayTitle: "男生备孕模式",
-    heroLabel: "一起备孕第 12 天",
+    heroLabel: "她周期第 12 天",
     heroPhase: "关键期 · 要上心",
     heroTitle: "这周多注意休息，咱配合好节奏",
     heroBody: "好好睡觉、少喝酒、别泡太烫的澡，跟她商量好安排就行。",

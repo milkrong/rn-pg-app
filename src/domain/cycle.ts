@@ -1,4 +1,8 @@
-import { addDays, daysBetween, isWithin } from "./date";
+import { addDays, daysBetween, isWithin, parseDate } from "./date";
+import type { AppCycleLog } from "./records";
+
+export const DEFAULT_CYCLE_LENGTH = 28;
+export const DEFAULT_PERIOD_LENGTH = 5;
 
 export type CyclePhase =
   | "period"
@@ -56,6 +60,109 @@ export function estimateCycle(input: CycleInput): CycleEstimate {
 
 export function formatCycleDayLabel(cycleDay: number): string {
   return `周期第 ${cycleDay} 天`;
+}
+
+export type ComputedCycleSummary = {
+  cycleDay: number;
+  fertileWindow: FertileWindow;
+  fertileWindowLabel: string;
+  phase: CyclePhase;
+  recentSymptoms: string[];
+  latestPeriodStart: string;
+};
+
+export function computeCycleSummary(
+  records: AppCycleLog[],
+  today: string,
+  options?: { averageCycleLength?: number; averagePeriodLength?: number }
+): ComputedCycleSummary | null {
+  const latestPeriodStart = findLatestPeriodStart(records);
+  if (!latestPeriodStart) {
+    return null;
+  }
+
+  const averageCycleLength = options?.averageCycleLength ?? DEFAULT_CYCLE_LENGTH;
+  const averagePeriodLength = options?.averagePeriodLength ?? DEFAULT_PERIOD_LENGTH;
+  const estimate = estimateCycle({
+    today,
+    latestPeriodStart,
+    averageCycleLength,
+    averagePeriodLength
+  });
+
+  return {
+    cycleDay: estimate.cycleDay,
+    fertileWindow: estimate.fertileWindow,
+    fertileWindowLabel: formatFertileWindow(estimate.fertileWindow),
+    phase: estimate.phase,
+    recentSymptoms: collectRecentSymptoms(records, today),
+    latestPeriodStart
+  };
+}
+
+export function formatFertileWindow(window: FertileWindow): string {
+  return `${formatChineseDate(window.startsOn)}-${formatChineseDate(window.endsOn)}`;
+}
+
+function formatChineseDate(value: string): string {
+  const date = parseDate(value);
+  return `${date.getUTCMonth() + 1}月${date.getUTCDate()}日`;
+}
+
+function findLatestPeriodStart(records: AppCycleLog[]): string | null {
+  const periodDates = new Set(
+    records
+      .filter((record) => isPeriodRecord(record))
+      .map((record) => record.happenedOn)
+  );
+
+  if (periodDates.size === 0) {
+    return null;
+  }
+
+  const sortedDates = Array.from(periodDates).sort((a, b) => b.localeCompare(a));
+  let start = sortedDates[0];
+  while (periodDates.has(addDays(start, -1))) {
+    start = addDays(start, -1);
+  }
+  return start;
+}
+
+function isPeriodRecord(record: AppCycleLog): boolean {
+  if (record.logType === "period") {
+    return true;
+  }
+  return record.payload.kind === "period";
+}
+
+function collectRecentSymptoms(records: AppCycleLog[], today: string, lookbackDays = 7): string[] {
+  const since = addDays(today, -lookbackDays);
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  const sorted = [...records]
+    .filter((record) => record.happenedOn >= since && record.happenedOn <= today)
+    .sort((a, b) => b.happenedOn.localeCompare(a.happenedOn));
+
+  for (const record of sorted) {
+    if (!isSymptomRecord(record)) {
+      continue;
+    }
+    const value = typeof record.payload.value === "string" ? record.payload.value.trim() : "";
+    if (!value || seen.has(value)) {
+      continue;
+    }
+    seen.add(value);
+    result.push(value);
+    if (result.length >= 3) {
+      break;
+    }
+  }
+  return result;
+}
+
+function isSymptomRecord(record: AppCycleLog): boolean {
+  return record.logType === "symptom" || record.payload.kind === "symptom";
 }
 
 export function getTodayTasks(input: CycleInput): TodayTask[] {

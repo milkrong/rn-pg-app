@@ -17,6 +17,9 @@ import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import type { User } from "@supabase/supabase-js";
+import { computeCycleSummary } from "@/domain/cycle";
+import { formatDate } from "@/domain/date";
+import type { AppCycleLog } from "@/domain/records";
 import type { UserRole } from "@/domain/userRole";
 import { getRoleContent } from "@/domain/userRole";
 import { demoCoachContext } from "@/fixtures/demoData";
@@ -26,6 +29,7 @@ import {
   isCoachAbortError,
   type CoachAnswer
 } from "@/services/aiCoach";
+import { loadCycleSourceRecords } from "@/services/cycleSummarySource";
 import { getUserRole, subscribeUserRole } from "@/services/userRolePreference";
 import { Screen } from "@/ui/Screen";
 import { TypingDots } from "@/ui/TypingDots";
@@ -75,6 +79,7 @@ export default function CoachScreen() {
   const [inputHeight, setInputHeight] = useState(INPUT_MIN_HEIGHT);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [records, setRecords] = useState<AppCycleLog[]>([]);
 
   useEffect(() => {
     let isMounted = true;
@@ -135,10 +140,32 @@ export default function CoachScreen() {
     };
   }, []);
 
+  useEffect(() => {
+    let isMounted = true;
+    loadCycleSourceRecords(role, Boolean(user))
+      .then((result) => {
+        if (isMounted) {
+          setRecords(result.records);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setRecords([]);
+        }
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [role, user]);
+
   const hasStarted = messages.length > 1;
   const quotaReached = answer ? answer.usage.messagesUsedToday >= answer.usage.dailyLimit : false;
 
   const quickPrompts = useMemo(() => getQuickPrompts(role), [role]);
+  const computedSummary = useMemo(
+    () => computeCycleSummary(records, formatDate(new Date())),
+    [records]
+  );
 
   function scrollToBottom(animated = true) {
     requestAnimationFrame(() => {
@@ -199,12 +226,19 @@ export default function CoachScreen() {
 
     try {
       const roleContent = getRoleContent(role) ?? getRoleContent("female");
+      const cycleSummary = computedSummary
+        ? {
+            cycleDay: computedSummary.cycleDay,
+            fertileWindow: computedSummary.fertileWindowLabel,
+            recentSymptoms: computedSummary.recentSymptoms
+          }
+        : roleContent?.coachSummary ?? demoCoachContext.cycleSummary;
       let streamedText = "";
       const result = await askAiCoachStream(
         {
           question: trimmed,
           consent: demoCoachContext.consent,
-          cycleSummary: roleContent?.coachSummary ?? demoCoachContext.cycleSummary
+          cycleSummary
         },
         {
           onDelta: (text) => {
@@ -409,7 +443,9 @@ export default function CoachScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.contextKicker}>参考信息</Text>
                   <Text style={styles.contextTitle}>
-                    {getRoleContent(role)?.coachSummary.fertileWindow ?? "记录越多，建议越靠谱"}
+                    {computedSummary?.fertileWindowLabel ??
+                      getRoleContent(role)?.coachSummary.fertileWindow ??
+                      "记录越多，建议越靠谱"}
                   </Text>
                 </View>
                 <View style={styles.contextTopActions}>
@@ -447,7 +483,10 @@ export default function CoachScreen() {
             >
               <Ionicons name="sparkles-outline" color={colors.coral} size={14} />
               <Text style={styles.contextPillText} numberOfLines={1}>
-                {role === "male" ? "男生" : "女生"} · {getRoleContent(role)?.coachSummary.fertileWindow ?? "记录中"}
+                {role === "male" ? "男生" : "女生"} ·{" "}
+                {computedSummary?.fertileWindowLabel ??
+                  getRoleContent(role)?.coachSummary.fertileWindow ??
+                  "记录中"}
               </Text>
               <Ionicons name="chevron-down" color={colors.muted} size={14} />
             </Pressable>

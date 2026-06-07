@@ -1,14 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import type { User } from "@supabase/supabase-js";
+import { computeCycleSummary, type ComputedCycleSummary, type CyclePhase } from "@/domain/cycle";
 import { formatDate } from "@/domain/date";
 import type { AppCycleLog, RecordKind, RecordOption } from "@/domain/records";
 import { getRecordOption, getRecordOptions } from "@/domain/records";
 import type { UserRole } from "@/domain/userRole";
-import { getRoleContent, ROLE_CONTENT } from "@/domain/userRole";
-import { loadCycleRecords } from "@/services/recordStore";
+import { getRoleContent } from "@/domain/userRole";
+import { getAuthSnapshot, subscribeToAuthChanges } from "@/services/auth";
+import { loadCycleSourceRecords, type CycleSummarySource } from "@/services/cycleSummarySource";
 import { getUserRole, saveUserRole, subscribeUserRole } from "@/services/userRolePreference";
 import { QuickLogButton } from "@/ui/QuickLogButton";
 import { RoleGate } from "@/ui/RoleGate";
@@ -19,6 +22,8 @@ export default function TodayScreen() {
   const router = useRouter();
   const [role, setRole] = useState<UserRole | null>(null);
   const [records, setRecords] = useState<AppCycleLog[]>([]);
+  const [summarySource, setSummarySource] = useState<CycleSummarySource>("self");
+  const [user, setUser] = useState<User | null>(null);
   const content = getRoleContent(role);
 
   useEffect(() => {
@@ -40,23 +45,41 @@ export default function TodayScreen() {
 
   useEffect(() => {
     let isMounted = true;
-
-    loadCycleRecords()
-      .then((nextRecords) => {
+    getAuthSnapshot()
+      .then((snapshot) => {
         if (isMounted) {
-          setRecords(nextRecords);
+          setUser(snapshot.user);
+        }
+      })
+      .catch(() => undefined);
+    const unsubscribe = subscribeToAuthChanges(setUser);
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    loadCycleSourceRecords(role, Boolean(user))
+      .then((result) => {
+        if (isMounted) {
+          setRecords(result.records);
+          setSummarySource(result.source);
         }
       })
       .catch(() => {
         if (isMounted) {
           setRecords([]);
+          setSummarySource("none");
         }
       });
 
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [role, user]);
 
   async function selectRole(nextRole: UserRole) {
     setRole(nextRole);
@@ -77,6 +100,11 @@ export default function TodayScreen() {
   const homeModel = getHomeModel(content.role);
   const quickOptions = homeModel.quickKinds.map((kind) => getRecordOption(content.role, kind));
   const completedCount = quickOptions.filter((option) => getTodayRecordValue(records, option.kind, today)).length;
+  const cycleSummary = useMemo(() => computeCycleSummary(records, today), [records, today]);
+  const heroCopy = buildHeroCopy(content.role, cycleSummary, summarySource, {
+    fallbackLabel: content.heroLabel,
+    fallbackPhase: content.heroPhase
+  });
 
   return (
     <Screen>
@@ -93,8 +121,8 @@ export default function TodayScreen() {
 
         <LinearGradient colors={[colors.blush, colors.surface]} style={styles.hero}>
           <View style={styles.heroTop}>
-            <Text style={styles.heroLabel}>{content.heroLabel}</Text>
-            <Text style={styles.heroPhase}>{content.heroPhase}</Text>
+            <Text style={styles.heroLabel}>{heroCopy.label}</Text>
+            <Text style={styles.heroPhase}>{heroCopy.phase}</Text>
           </View>
           <Text style={styles.heroTitle}>{homeModel.title}</Text>
           <Text style={styles.heroBody}>{homeModel.body}</Text>
@@ -420,6 +448,37 @@ function getHomeModel(role: UserRole): HomeModel {
 function getTodayRecordValue(records: AppCycleLog[], kind: RecordKind, today: string): string | null {
   const record = records.find((item) => item.happenedOn === today && item.payload.kind === kind);
   return typeof record?.payload.value === "string" && record.payload.value.length > 0 ? record.payload.value : null;
+}
+
+function buildHeroCopy(
+  role: UserRole,
+  summary: ComputedCycleSummary | null,
+  source: CycleSummarySource,
+  fallback: { fallbackLabel: string; fallbackPhase: string }
+): { label: string; phase: string } {
+  if (!summary) {
+    if (role === "female") {
+      return { label: "还没记录经期", phase: "记一次经期，开始计算 🌱" };
+    }
+    if (source === "none") {
+      return { label: "还没绑定搭档", phase: "去「我的 → 搭档绑定」连她的记录" };
+    }
+    return { label: fallback.fallbackLabel, phase: fallback.fallbackPhase };
+  }
+
+  const label = role === "male" ? `她周期第 ${summary.cycleDay} 天` : `周期第 ${summary.cycleDay} 天`;
+  return { label, phase: describePhase(summary.phase, role) };
+}
+
+function describePhase(phase: CyclePhase, role: UserRole): string {
+  const map: Record<CyclePhase, string> = {
+    period: role === "male" ? "她在经期 · 多关心" : "经期 · 多休息",
+    follicular: "卵泡期 · 状态在回升",
+    "fertile-soon": "好孕窗口快到了 🌸",
+    fertile: "好孕窗口 ✨",
+    luteal: role === "male" ? "黄体期 · 留心情绪" : "黄体期 · 留意感受"
+  };
+  return map[phase];
 }
 
 function getQuickLabel(option: RecordOption, records: AppCycleLog[], today: string): string {
