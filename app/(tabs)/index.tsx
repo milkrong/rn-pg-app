@@ -117,8 +117,8 @@ export default function TodayScreen() {
 
         <View style={styles.progressCard}>
           <View style={styles.progressTop}>
-            <Text style={styles.progressTitle}>今日记录 {completedCount}/{quickOptions.length}</Text>
-            <Text style={styles.progressHint}>漏一天也没关系</Text>
+            <Text style={styles.progressTitle}>今天完成 {completedCount}/{quickOptions.length}</Text>
+            <Text style={styles.progressHint}>偶尔漏掉也没关系</Text>
           </View>
           <View style={styles.progressDots}>
             {quickOptions.map((option) => {
@@ -133,7 +133,7 @@ export default function TodayScreen() {
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>快速记录</Text>
+        <Text style={styles.sectionTitle}>随手记一笔</Text>
         <View style={styles.quickGrid}>
           {quickOptions.map((item) => (
             <QuickLogButton
@@ -150,8 +150,8 @@ export default function TodayScreen() {
         <View style={styles.coachCard}>
           <View style={styles.coachHeader}>
             <View>
-              <Text style={styles.coachTitle}>{content.role === "male" ? "AI 伴侣教练" : "AI 备孕教练"}</Text>
-              <Text style={styles.coachBody}>把今天的建议讲清楚，或者帮你复盘最近记录。</Text>
+              <Text style={styles.coachTitle}>{content.role === "male" ? "AI 备孕搭档" : "AI 备孕助手"}</Text>
+              <Text style={styles.coachBody}>聊聊今天要注意的，或者帮你回顾最近的记录。</Text>
             </View>
             <Ionicons name="chatbubble-ellipses-outline" color={colors.sage} size={24} />
           </View>
@@ -394,26 +394,26 @@ type HomeModel = {
 function getHomeModel(role: UserRole): HomeModel {
   if (role === "male") {
     return {
-      title: "今天先同步安排，再照顾状态",
-      body: "配合窗口里，低压力沟通、规律睡眠和避免高温，比临时补救更有价值。",
+      title: "先跟她对好安排，再注意自己的状态",
+      body: "关键期间保持沟通、好好睡觉、少碰高温就够了，比事后补救有用。",
       primaryKind: "intercourse",
       secondaryKind: "sleep",
-      primaryAction: "同步安排",
+      primaryAction: "记录安排",
       secondaryAction: "记录睡眠",
       quickKinds: ["intercourse", "sleep", "alcohol", "heat"],
-      prompts: ["今天怎么配合更轻松？", "为什么要避免高温？", "帮我看最近记录"]
+      prompts: ["今天怎么做比较好？", "为什么不能泡热水澡？", "帮我看看最近的情况"]
     };
   }
 
   return {
-    title: "今天先记录 LH，再补一条体温",
-    body: "易孕期临近，连续记录 LH 和基础体温，会让排卵窗口判断更稳定。",
+    title: "先测排卵试纸，再量个体温",
+    body: "好孕窗口快到了，坚持每天测一下排卵试纸和体温，判断会更准。",
     primaryKind: "ovulation_test",
     secondaryKind: "temperature",
-    primaryAction: "记录 LH",
+    primaryAction: "测排卵试纸",
     secondaryAction: "记录体温",
     quickKinds: ["ovulation_test", "temperature", "symptom", "period"],
-    prompts: ["为什么今天建议记录 LH？", "今天怎么安排更轻松？", "帮我复盘记录"]
+    prompts: ["为什么今天要测排卵试纸？", "今天怎么安排比较好？", "帮我看看最近的记录"]
   };
 }
 

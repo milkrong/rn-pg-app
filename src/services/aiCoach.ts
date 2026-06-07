@@ -41,6 +41,24 @@ export async function askAiCoach(input: {
   return data;
 }
 
+export class CoachAbortError extends Error {
+  constructor() {
+    super("AI coach stream was aborted.");
+    this.name = "CoachAbortError";
+  }
+}
+
+export function isCoachAbortError(err: unknown): boolean {
+  if (err instanceof CoachAbortError) {
+    return true;
+  }
+  if (err && typeof err === "object" && "name" in err) {
+    const name = (err as { name?: string }).name;
+    return name === "AbortError" || name === "CoachAbortError";
+  }
+  return false;
+}
+
 export async function askAiCoachStream(
   input: {
     question: string;
@@ -50,8 +68,17 @@ export async function askAiCoachStream(
   callbacks: {
     onDelta: (text: string) => void;
     onFinal?: (answer: CoachAnswer) => void;
+  },
+  options?: {
+    signal?: AbortSignal;
   }
 ): Promise<CoachAnswer> {
+  const signal = options?.signal;
+
+  if (signal?.aborted) {
+    throw new CoachAbortError();
+  }
+
   const supabase = requireSupabase();
   const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
 
@@ -78,7 +105,13 @@ export async function askAiCoachStream(
         fertileWindow: input.consent.includeCycleData ? input.cycleSummary.fertileWindow : undefined,
         recentSignals: input.consent.includeSymptoms ? input.cycleSummary.recentSymptoms : undefined
       }
-    })
+    }),
+    signal
+  }).catch((err) => {
+    if (isCoachAbortError(err)) {
+      throw new CoachAbortError();
+    }
+    throw err;
   });
 
   if (!response.ok) {
@@ -87,7 +120,10 @@ export async function askAiCoachStream(
 
   if (!response.body) {
     const answer = await askAiCoach(input);
-    await emitTypewriterText(answer.answer, callbacks.onDelta);
+    await emitTypewriterText(answer.answer, callbacks.onDelta, signal);
+    if (signal?.aborted) {
+      throw new CoachAbortError();
+    }
     callbacks.onFinal?.(answer);
     return answer;
   }
@@ -97,35 +133,47 @@ export async function askAiCoachStream(
   let buffer = "";
   let finalAnswer: CoachAnswer | null = null;
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) {
-      break;
+  try {
+    while (true) {
+      if (signal?.aborted) {
+        await reader.cancel().catch(() => undefined);
+        throw new CoachAbortError();
+      }
+
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+
+      buffer += decoder.decode(value, { stream: true });
+      const events = buffer.split("\n\n");
+      buffer = events.pop() ?? "";
+
+      for (const eventText of events) {
+        const event = parseSseEvent(eventText);
+        if (!event) {
+          continue;
+        }
+
+        if (event.type === "delta") {
+          callbacks.onDelta(event.value);
+        }
+
+        if (event.type === "final") {
+          finalAnswer = event.value;
+          callbacks.onFinal?.(event.value);
+        }
+
+        if (event.type === "error") {
+          throw new Error(event.value);
+        }
+      }
     }
-
-    buffer += decoder.decode(value, { stream: true });
-    const events = buffer.split("\n\n");
-    buffer = events.pop() ?? "";
-
-    for (const eventText of events) {
-      const event = parseSseEvent(eventText);
-      if (!event) {
-        continue;
-      }
-
-      if (event.type === "delta") {
-        callbacks.onDelta(event.value);
-      }
-
-      if (event.type === "final") {
-        finalAnswer = event.value;
-        callbacks.onFinal?.(event.value);
-      }
-
-      if (event.type === "error") {
-        throw new Error(event.value);
-      }
+  } catch (err) {
+    if (isCoachAbortError(err)) {
+      throw new CoachAbortError();
     }
+    throw err;
   }
 
   if (!finalAnswer) {
@@ -182,8 +230,15 @@ function parseSseEvent(value: string):
   return null;
 }
 
-async function emitTypewriterText(text: string, onDelta: (text: string) => void) {
+async function emitTypewriterText(
+  text: string,
+  onDelta: (text: string) => void,
+  signal?: AbortSignal
+) {
   for (const char of text) {
+    if (signal?.aborted) {
+      return;
+    }
     onDelta(char);
     await new Promise((resolve) => setTimeout(resolve, 14));
   }

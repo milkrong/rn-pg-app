@@ -62,7 +62,7 @@ export default function InsightsScreen() {
   }
 
   return (
-    <Screen title="趋势洞察">
+    <Screen title="数据分析">
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         <View style={styles.segmented}>
           {ranges.map((item) => {
@@ -87,7 +87,7 @@ export default function InsightsScreen() {
             </View>
             <View style={styles.scoreBadge}>
               <Text style={styles.scoreValue}>{model.score}</Text>
-              <Text style={styles.scoreLabel}>完整度</Text>
+              <Text style={styles.scoreLabel}>完成度</Text>
             </View>
           </View>
           <Text style={styles.summaryBody}>{model.summaryBody}</Text>
@@ -102,8 +102,8 @@ export default function InsightsScreen() {
         </View>
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>关键洞察</Text>
-          <Text style={styles.sectionMeta}>{content?.label}入口</Text>
+          <Text style={styles.sectionTitle}>重点发现</Text>
+          <Text style={styles.sectionMeta}>{content?.label}视角</Text>
         </View>
 
         {model.items.map((item) => (
@@ -125,7 +125,7 @@ export default function InsightsScreen() {
         <View style={styles.report}>
           <View style={styles.reportHeader}>
             <View>
-              <Text style={styles.reportLabel}>PRO REPORT</Text>
+              <Text style={styles.reportLabel}>PRO 报告</Text>
               <Text style={styles.reportTitle}>{content?.reportTitle}</Text>
             </View>
             <Ionicons name="lock-closed-outline" size={20} color={colors.surface} />
@@ -143,7 +143,7 @@ export default function InsightsScreen() {
 
         <Pressable onPress={askCoach} style={styles.coachButton}>
           <Ionicons name="chatbubble-ellipses-outline" size={20} color={colors.surface} />
-          <Text style={styles.coachButtonText}>问 AI Coach 分析本周期</Text>
+          <Text style={styles.coachButtonText}>让 AI 帮我分析这轮数据</Text>
         </Pressable>
       </ScrollView>
     </Screen>
@@ -158,13 +158,13 @@ function getInsightModel(role: UserRole, range: InsightRange) {
   if (isMale) {
     return {
       summaryLabel: suffix,
-      summaryTitle: range === "partner" ? "配合窗口稳定，压力负担可再降低" : "生活习惯稳定，适合继续配合窗口",
+      summaryTitle: range === "partner" ? "配合节奏不错，压力可以再放松一点" : "最近状态挺好，继续保持就行",
       summaryBody:
         range === "threeCycles"
-          ? "睡眠、饮酒和高温暴露记录逐渐连续，下一步可以把同房间隔和伴侣窗口对齐。"
-          : "近几天睡眠和饮酒记录比较稳定，同房节奏适合当前窗口。建议今天继续减少高温暴露。",
+          ? "最近睡眠、喝酒的情况记得越来越全了，下一步试试同房间隔也配合好窗口期。"
+          : "最近睡眠和喝酒都挺规律，同房节奏也合适。今天继续注意别碰太烫的水就好。",
       score: range === "partner" ? "4/5" : "5/6",
-      coachPrompt: "帮我分析本周期男生备孕支持记录，给出今天的配合建议。",
+      coachPrompt: "帮我看看这轮我的备孕数据，今天该注意什么？",
       timeline: [
         { label: "睡眠", active: true },
         { label: "饮酒", active: true },
@@ -176,41 +176,41 @@ function getInsightModel(role: UserRole, range: InsightRange) {
           icon: "heart-outline",
           title: "安排覆盖",
           value: "合适",
-          body: "当前间隔适合配合易孕窗口，重点是提前沟通，避免临时变成压力。",
-          action: "去记录同房或同步安排",
+          body: "目前的节奏挺合适。提前说好安排，别临时再商量就不会有压力。",
+          action: "去记录安排",
           tone: "coral"
         },
         {
           icon: "bed-outline",
           title: "生活习惯",
           value: "稳定",
-          body: "睡眠和饮酒记录比较连续；高温暴露保持低水平，对备孕支持更友好。",
-          action: "继续记录睡眠、饮酒、高温",
+          body: "最近睡觉和喝酒的记录都挺完整，继续保持就好。",
+          action: "继续记录就好",
           tone: "sage"
         },
         {
           icon: "people-outline",
           title: "协作质量",
           value: range === "partner" ? "待增强" : "良好",
-          body: "男生侧的洞察应该服务两个人的节奏，而不是单独制造任务感。",
-          action: "把关键结论发给 Coach 生成沟通建议",
+          body: "这里的分析是帮你俩配合得更顺畅，不是给你增加任务的。",
+          action: "让 AI 帮我生成沟通建议",
           tone: "ink"
         }
       ] as InsightItem[],
-      reportBody: "解锁后汇总睡眠、运动、饮酒、高温暴露、压力和同房节奏，形成伴侣协作复盘。",
-      reportPoints: ["同房节奏覆盖率", "生活习惯连续性", "高温与饮酒风险提醒"]
+      reportBody: "升级后可以看到完整的生活习惯分析，帮你俩一起复盘。",
+      reportPoints: ["同房节奏分析", "生活习惯总结", "风险提醒"]
     };
   }
 
   return {
     summaryLabel: suffix,
-    summaryTitle: range === "threeCycles" ? "记录稳定性提升，排卵判断会更可靠" : "易孕窗口临近，LH 和体温是今天重点",
+    summaryTitle: range === "threeCycles" ? "记录越来越稳定了，排卵判断会更准" : "好孕窗口快到了，今天重点测排卵试纸和体温",
     summaryBody:
       range === "partner"
-        ? "当前最有价值的是把易孕窗口、同房安排和身体感受同步给伴侣，减少临时沟通成本。"
-        : "记录完整度已经足够给出方向，但 LH 试纸还缺今天的数据。建议固定时间补一次记录。",
+        ? "现在最重要的是把窗口期和安排告诉他，减少临时沟通的麻烦。"
+        : "记录已经够看趋势了，不过排卵试纸今天还缺一条。找个固定时间补上就好。",
     score: range === "threeCycles" ? "82%" : "4/6",
-    coachPrompt: "帮我分析本周期 LH、体温、症状和同房覆盖，给出今天的备孕建议。",
+    coachPrompt: "帮我看看这轮的排卵和体温数据，今天该注意什么？",
     timeline: [
       { label: "经期", active: true },
       { label: "LH", active: range !== "partner" },
@@ -222,29 +222,29 @@ function getInsightModel(role: UserRole, range: InsightRange) {
         icon: "flask-outline",
         title: "排卵信号",
         value: "待确认",
-        body: "预测窗口已接近，但今天 LH 尚未记录。补足后可以更准确判断峰值。",
-        action: "去记录 LH 试纸",
+        body: "窗口快到了，不过今天还没测排卵试纸。测了之后能更准地判断排卵。",
+        action: "去测排卵试纸",
         tone: "coral"
       },
       {
         icon: "pulse-outline",
         title: "体温趋势",
         value: "平稳",
-        body: "基础体温连续性不错，后续如果出现持续升温，可用于回看排卵后变化。",
-        action: "继续晨起测温",
+        body: "体温记得挺连续的，接下来要是持续升温，就能看出排卵的变化了。",
+        action: "继续每天量体温",
         tone: "sage"
       },
       {
         icon: "calendar-outline",
         title: "安排覆盖",
         value: range === "partner" ? "可同步" : "中等",
-        body: "窗口期建议把安排提前摊开，不用追求每天打卡，重点是低压力覆盖。",
-        action: "问 Coach 生成今天安排",
+        body: "窗口期不用每天都安排，提前商量好、放轻松就好。",
+        action: "让 AI 帮我安排今天",
         tone: "ink"
       }
     ] as InsightItem[],
-    reportBody: "解锁后汇总周期长度、LH 峰值、体温升高、症状和同房覆盖，生成可复盘的月度报告。",
-    reportPoints: ["LH 峰值与窗口预测", "体温双相趋势", "记录缺口和下一步建议"]
+    reportBody: "升级后可以看完整的月度分析报告，排卵规律一目了然。",
+    reportPoints: ["排卵规律分析", "体温变化趋势", "改进建议"]
   };
 }
 

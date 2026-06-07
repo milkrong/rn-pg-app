@@ -213,7 +213,7 @@ export default function ProfileScreen() {
 
     Alert.alert(
       "删除账号",
-      "删除后会移除你的云端账号、周期记录、AI 对话、用量和订阅权益记录。此操作不可恢复。",
+      "删除后你的账号、备孕记录、AI 对话都会清除，而且无法恢复。",
       [
         { text: "取消", style: "cancel" },
         {
@@ -242,20 +242,20 @@ export default function ProfileScreen() {
   }
 
   return (
-    <Screen title="隐私与订阅">
+    <Screen title="我的">
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         {!isConfigured ? (
           <View style={styles.authCard}>
-            <Text style={styles.authTitle}>Supabase 未配置</Text>
+            <Text style={styles.authTitle}>服务未就绪</Text>
             <Text selectable style={styles.authBody}>
-              请设置 EXPO_PUBLIC_SUPABASE_URL 和 EXPO_PUBLIC_SUPABASE_KEY。
+              后台服务还没配好，暂时无法使用。
             </Text>
           </View>
         ) : null}
 
         {isConfigured ? (
           <View style={styles.authCard}>
-            <Text style={styles.authTitle}>{user ? "已登录" : "登录云端账户"}</Text>
+            <Text style={styles.authTitle}>{user ? "已登录" : "登录账号"}</Text>
             {user ? (
               <>
                 <Text selectable style={styles.authBody}>{user.email}</Text>
@@ -303,7 +303,7 @@ export default function ProfileScreen() {
         <View style={styles.plan}>
           <View style={styles.planHeader}>
             <View>
-              <Text style={styles.planEyebrow}>当前套餐</Text>
+              <Text style={styles.planEyebrow}>我的套餐</Text>
               <Text style={styles.planTitle}>{plan === "pro" ? "Nurture Pro" : "Nurture Free"}</Text>
             </View>
             <View style={styles.planBadge}>
@@ -311,7 +311,7 @@ export default function ProfileScreen() {
             </View>
           </View>
           <Text style={styles.planBody}>
-            今日 AI 用量 {aiUsage}/{getPlanLimits(plan).dailyAiMessages}。Pro 解锁每日 {proLimits.dailyAiMessages} 次 AI 问答、云同步和深度趋势报告。
+            今天已用 AI {aiUsage}/{getPlanLimits(plan).dailyAiMessages} 次。升级 Pro 每天可问 {proLimits.dailyAiMessages} 次，还能云端同步和看详细分析。
           </Text>
           <View style={styles.featureList}>
             {SUBSCRIPTION_FEATURES.map((feature) => {
@@ -326,10 +326,10 @@ export default function ProfileScreen() {
           </View>
           <View style={styles.subscriptionMeta}>
             <Text style={styles.subscriptionMetaText}>
-              {subscription?.package?.price ? `可选套餐 ${subscription.package.price}` : "RevenueCat offering 尚未返回价格"}
+              {subscription?.package?.price ? `${subscription.package.price}/月` : "正在获取价格…"}
             </Text>
             <Text style={styles.subscriptionMetaText}>
-              {plan === "pro" ? `有效期至 ${formatRenewalDate(subscription?.renewalDate)}` : "升级后通过 RevenueCat webhook 同步 Pro 状态"}
+              {plan === "pro" ? `Pro 有效期至 ${formatRenewalDate(subscription?.renewalDate)}` : "升级后自动激活 Pro"}
             </Text>
           </View>
           <View style={styles.subscriptionActions}>
@@ -339,7 +339,7 @@ export default function ProfileScreen() {
               style={[styles.planPrimaryButton, (!user || isSubscriptionBusy || plan === "pro") && styles.disabledButton]}
             >
               <Text style={styles.planPrimaryButtonText}>
-                {plan === "pro" ? "已开通 Pro" : isSubscriptionBusy ? "处理中" : "升级 Pro"}
+                {plan === "pro" ? "已是 Pro" : isSubscriptionBusy ? "处理中" : "升级到 Pro"}
               </Text>
             </Pressable>
             <Pressable
@@ -352,7 +352,7 @@ export default function ProfileScreen() {
           </View>
           <View style={styles.subscriptionFooter}>
             <Pressable disabled={!user || isSubscriptionBusy} onPress={() => handleSubscriptionAction("refresh")}>
-              <Text style={styles.planAction}>刷新状态</Text>
+              <Text style={styles.planAction}>刷新</Text>
             </Pressable>
             {subscription?.managementUrl ? (
               <Pressable onPress={openSubscriptionManagement}>
@@ -361,13 +361,13 @@ export default function ProfileScreen() {
             ) : null}
           </View>
           {!subscription?.canPurchase ? (
-            <Text style={styles.subscriptionHint}>请配置 RevenueCat 公钥后再测试真实购买。Expo Go 不支持原生购买，需要 dev build。</Text>
+            <Text style={styles.subscriptionHint}>订阅功能需要正式打包后才能使用。</Text>
           ) : null}
         </View>
 
         <View style={styles.roleCard}>
-          <Text style={styles.roleTitle}>我的入口</Text>
-          <Text style={styles.roleBody}>当前：{role ? ROLE_CONTENT[role].label : "未选择"}。切换后，首页、记录、洞察和 AI 教练都会按身份调整。</Text>
+          <Text style={styles.roleTitle}>我的模式</Text>
+          <Text style={styles.roleBody}>当前是{role ? ROLE_CONTENT[role].label : "未选择"}模式。切换后所有页面内容会跟着变。</Text>
           <View style={styles.roleActions}>
             <Pressable
               onPress={() => chooseRole("female")}
@@ -386,26 +386,26 @@ export default function ProfileScreen() {
 
         <PreferenceRow
           title="云同步"
-          body="开启后才上传授权的健康结构化数据。"
+          body="开启后你的记录会备份到云端。"
           enabled={cloudSyncEnabled}
           onChange={setCloudSyncEnabled}
         />
         <PreferenceRow
           title="AI 使用健康上下文"
-          body="每次调用都只发送你授权的数据摘要。"
+          body="AI 只会看你允许它看的数据。"
           enabled={aiContextEnabled}
           onChange={setAiContextEnabled}
         />
         <PreferenceRow
           title="写入 Apple Health"
-          body="只写入你在 Nurture 中明确记录的项目。"
+          body="只会把你在这里记的内容同步到健康 App。"
           enabled={healthWriteEnabled}
           onChange={setHealthWriteEnabled}
         />
 
         <View style={styles.legalCard}>
-          <Text style={styles.legalTitle}>上架合规</Text>
-          <Text style={styles.legalBody}>App Store 上架前需要把这些链接替换成正式网页 URL，并在 App Store Connect 中填写隐私标签。</Text>
+          <Text style={styles.legalTitle}>法律信息</Text>
+          <Text style={styles.legalBody}>以下是我们的法律条款，请在使用前阅读。</Text>
           <View style={styles.legalLinks}>
             {legalLinks.map((item) => (
               <Pressable key={item.label} onPress={() => Linking.openURL(item.url)} style={styles.legalLink}>
@@ -416,8 +416,8 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.danger}>
-          <Text style={styles.dangerTitle}>数据控制</Text>
-          <Text style={styles.dangerBody}>你可以关闭 AI 授权，也可以删除账号和云端数据。删除账号不会自动取消 App Store 或 Google Play 订阅，请先在订阅管理中取消。</Text>
+          <Text style={styles.dangerTitle}>账号与数据</Text>
+          <Text style={styles.dangerBody}>你可以随时关掉 AI 授权或删除账号。注意：删除账号不会自动取消订阅，请先去手机设置里取消。</Text>
           <Pressable
             disabled={!user || isDeletingAccount}
             onPress={confirmDeleteAccount}

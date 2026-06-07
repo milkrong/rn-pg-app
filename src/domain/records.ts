@@ -43,7 +43,7 @@ export const FEMALE_RECORD_OPTIONS: RecordOption[] = [
     icon: "water-outline",
     logType: "period",
     quickValues: ["少量", "中等", "较多", "点滴"],
-    placeholder: "经血量、颜色或痛感"
+    placeholder: "量多量少、颜色或有没有痛感"
   },
   {
     kind: "temperature",
@@ -51,15 +51,15 @@ export const FEMALE_RECORD_OPTIONS: RecordOption[] = [
     icon: "thermometer-outline",
     logType: "temperature",
     quickValues: ["36.3", "36.5", "36.7", "36.9"],
-    placeholder: "基础体温，例如 36.62"
+    placeholder: "体温，比如 36.62"
   },
   {
     kind: "ovulation_test",
-    label: "LH 试纸",
+    label: "排卵试纸",
     icon: "flask-outline",
     logType: "ovulation_test",
     quickValues: ["阴性", "弱阳", "阳性", "强阳"],
-    placeholder: "LH 结果或试纸颜色变化"
+    placeholder: "排卵试纸的结果（颜色深浅）"
   },
   {
     kind: "symptom",
@@ -67,7 +67,7 @@ export const FEMALE_RECORD_OPTIONS: RecordOption[] = [
     icon: "leaf-outline",
     logType: "symptom",
     quickValues: ["腹胀", "乳房胀痛", "拉丝白带", "情绪波动"],
-    placeholder: "身体信号或情绪"
+    placeholder: "身体有什么感觉？"
   },
   {
     kind: "intercourse",
@@ -75,7 +75,7 @@ export const FEMALE_RECORD_OPTIONS: RecordOption[] = [
     icon: "heart-outline",
     logType: "intercourse",
     quickValues: ["已安排", "已记录", "低压力", "跳过"],
-    placeholder: "同房安排或备注"
+    placeholder: "安排了就记一下"
   },
   {
     kind: "supplement",
@@ -83,7 +83,7 @@ export const FEMALE_RECORD_OPTIONS: RecordOption[] = [
     icon: "medkit-outline",
     logType: "supplement",
     quickValues: ["叶酸", "维D", "辅酶Q10", "按时"],
-    placeholder: "今天服用的补充剂"
+    placeholder: "今天吃了什么保健品"
   }
 ];
 
@@ -94,7 +94,7 @@ export const MALE_RECORD_OPTIONS: RecordOption[] = [
     icon: "bed-outline",
     logType: "symptom",
     quickValues: ["6h", "7h", "8h", "睡眠一般"],
-    placeholder: "睡眠时长或质量"
+    placeholder: "睡了几个小时？睡得好吗？"
   },
   {
     kind: "exercise",
@@ -102,7 +102,7 @@ export const MALE_RECORD_OPTIONS: RecordOption[] = [
     icon: "fitness-outline",
     logType: "symptom",
     quickValues: ["散步", "30分钟", "力量训练", "休息"],
-    placeholder: "运动类型和时长"
+    placeholder: "做了什么运动？多长时间？"
   },
   {
     kind: "alcohol",
@@ -110,15 +110,15 @@ export const MALE_RECORD_OPTIONS: RecordOption[] = [
     icon: "wine-outline",
     logType: "symptom",
     quickValues: ["无", "少量", "社交饮酒", "已避免"],
-    placeholder: "饮酒情况"
+    placeholder: "今天喝了吗？"
   },
   {
     kind: "heat",
-    label: "高温",
+    label: "高温接触",
     icon: "sunny-outline",
     logType: "symptom",
     quickValues: ["无", "热水澡", "桑拿", "久坐"],
-    placeholder: "高温暴露情况"
+    placeholder: "泡澡、桑拿或久坐了吗？"
   },
   {
     kind: "intercourse",
@@ -126,7 +126,7 @@ export const MALE_RECORD_OPTIONS: RecordOption[] = [
     icon: "heart-outline",
     logType: "intercourse",
     quickValues: ["已安排", "已记录", "低压力", "跳过"],
-    placeholder: "同房节奏或备注"
+    placeholder: "安排了就记一下"
   },
   {
     kind: "stress",
@@ -134,7 +134,7 @@ export const MALE_RECORD_OPTIONS: RecordOption[] = [
     icon: "pulse-outline",
     logType: "symptom",
     quickValues: ["低", "中等", "偏高", "已放松"],
-    placeholder: "压力状态或放松方式"
+    placeholder: "今天压力大吗？"
   }
 ];
 
@@ -170,9 +170,9 @@ export function formatRecordDetail(log: Pick<AppCycleLog, "payload" | "happenedO
 function fallbackLabel(logType: CycleLogType): string {
   const labels: Record<CycleLogType, string> = {
     period: "经期",
-    symptom: "记录",
+    symptom: "身体记录",
     temperature: "体温",
-    ovulation_test: "LH 试纸",
+    ovulation_test: "排卵试纸",
     intercourse: "同房",
     supplement: "补充剂"
   };

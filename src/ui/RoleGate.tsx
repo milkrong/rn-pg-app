@@ -11,22 +11,22 @@ export function RoleGate({ onSelect }: Props) {
   return (
     <View style={styles.wrap}>
       <Text style={styles.kicker}>Nurture</Text>
-      <Text style={styles.title}>选择你的备孕入口</Text>
+      <Text style={styles.title}>你是谁？</Text>
       <Text style={styles.body}>
-        不同性别看到的记录重点会不同。你可以之后在 Profile 里随时切换。
+        选择身份后，我们会给你看不同的内容。随时可以切换。
       </Text>
 
       <View style={styles.options}>
         <RoleOption
           role="female"
-          title="女生入口"
-          body="周期、经期、LH、基础体温、症状和排卵窗口。"
+          title="我是女生"
+          body="记录经期和排卵，了解什么时候最容易怀上。"
           onSelect={onSelect}
         />
         <RoleOption
           role="male"
-          title="男生入口"
-          body="精子健康习惯、同房计划、睡眠运动和伴侣支持。"
+          title="我是男生"
+          body="调整生活习惯，配合她的节奏一起备孕。"
           onSelect={onSelect}
         />
       </View>

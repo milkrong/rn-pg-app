@@ -10,31 +10,31 @@ export type SubscriptionFeature = {
 
 export const SUBSCRIPTION_FEATURES: SubscriptionFeature[] = [
   {
-    label: `每日 ${getPlanLimits("pro").dailyAiMessages} 次 AI 问答`,
+    label: `每天 ${getPlanLimits("pro").dailyAiMessages} 次 AI 对话`,
     includedIn: ["pro"]
   },
   {
-    label: "云端同步记录",
+    label: "记录云端备份",
     includedIn: ["pro"]
   },
   {
-    label: "深度趋势报告",
+    label: "月度分析报告",
     includedIn: ["pro"]
   },
   {
-    label: "HealthKit 记录同步",
+    label: "健康 App 数据同步",
     includedIn: ["free", "pro"]
   }
 ];
 
 export function formatRenewalDate(value?: string | null): string {
   if (!value) {
-    return "未获取到续费日期";
+    return "暂未获取到";
   }
 
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
-    return "续费日期异常";
+    return "日期有误";
   }
 
   return date.toLocaleDateString("zh-CN", {

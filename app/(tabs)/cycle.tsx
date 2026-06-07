@@ -20,7 +20,7 @@ export default function CycleScreen() {
   const [note, setNote] = useState("");
   const [records, setRecords] = useState<AppCycleLog[]>([]);
   const [isSaving, setIsSaving] = useState(false);
-  const [status, setStatus] = useState("登录后会自动同步到云端。");
+  const [status, setStatus] = useState("登录后记录会自动备份到云端。");
   const content = getRoleContent(role) ?? getRoleContent("female");
   const activeRole = role ?? "female";
   const today = formatDate(new Date());
@@ -84,7 +84,7 @@ export default function CycleScreen() {
       })
       .catch(() => {
         if (isMounted) {
-          setStatus("记录暂时只保存在本机。");
+          setStatus("暂时只保存在手机上，登录后可以同步。");
         }
       });
 
@@ -96,12 +96,12 @@ export default function CycleScreen() {
   async function saveRecord() {
     const value = selectedValue.trim() || note.trim();
     if (!value) {
-      setStatus("先选择一个快捷值，或写一点备注。");
+      setStatus("先选一个选项，或者写点备注。");
       return;
     }
 
     setIsSaving(true);
-    setStatus("正在保存记录...");
+    setStatus("保存中…");
 
     try {
       const nextRecords = await addCycleRecord({
@@ -112,9 +112,9 @@ export default function CycleScreen() {
       setRecords(nextRecords);
       setSelectedValue("");
       setNote("");
-      setStatus(nextRecords[0]?.syncStatus === "synced" ? "已保存并同步。" : "已保存到本机，登录后可同步。");
+      setStatus(nextRecords[0]?.syncStatus === "synced" ? "已保存，已同步到云端 ✓" : "已保存到手机，登录后可以同步。");
     } catch {
-      setStatus("保存失败，请稍后再试。");
+      setStatus("保存失败了，稍后再试试。");
     } finally {
       setIsSaving(false);
     }
@@ -124,9 +124,9 @@ export default function CycleScreen() {
     try {
       const nextRecords = await removeCycleRecord(localId);
       setRecords(nextRecords);
-      setStatus("记录已删除。");
+      setStatus("已删除。");
     } catch {
-      setStatus("删除失败，请稍后再试。");
+      setStatus("删除失败了，稍后再试试。");
     }
   }
 
@@ -148,13 +148,13 @@ export default function CycleScreen() {
             </View>
             <View style={styles.completionBadge}>
               <Text style={styles.completionValue}>{completedToday}/{recordOptions.length}</Text>
-              <Text style={styles.completionLabel}>今日记录</Text>
+              <Text style={styles.completionLabel}>今日完成</Text>
             </View>
           </View>
           <Text style={styles.statusBody}>{content?.cyclePanelBody}</Text>
           <View style={styles.recommendation}>
             <Ionicons name="sparkles-outline" color={colors.coral} size={17} />
-            <Text style={styles.recommendationText}>建议先记录：{getRecordOption(activeRole, getRecommendedKind(activeRole)).label}</Text>
+            <Text style={styles.recommendationText}>推荐先记：{getRecordOption(activeRole, getRecommendedKind(activeRole)).label}</Text>
           </View>
         </View>
 
@@ -178,7 +178,7 @@ export default function CycleScreen() {
                 </View>
                 <Text style={[styles.trackerLabel, isSelected && styles.trackerLabelActive]}>{option.label}</Text>
                 <Text style={[styles.trackerValue, isSelected && styles.trackerValueActive]}>
-                  {todayValue ?? "未记录"}
+                  {todayValue ?? "还没记"}
                 </Text>
                 {isComplete ? <View style={styles.doneDot} /> : null}
               </Pressable>
@@ -194,7 +194,7 @@ export default function CycleScreen() {
             </View>
             <View style={styles.syncBadge}>
               <Ionicons name="cloud-done-outline" color={colors.sage} size={16} />
-              <Text style={styles.syncText}>云同步</Text>
+              <Text style={styles.syncText}>已同步</Text>
             </View>
           </View>
 
@@ -224,12 +224,12 @@ export default function CycleScreen() {
 
           <Pressable style={[styles.saveButton, isSaving && styles.saveButtonDisabled]} onPress={saveRecord} disabled={isSaving}>
             <Ionicons name="add-circle-outline" color={colors.surface} size={19} />
-            <Text style={styles.saveText}>{isSaving ? "保存中" : "保存记录"}</Text>
+            <Text style={styles.saveText}>{isSaving ? "保存中…" : "保存"}</Text>
           </Pressable>
         </View>
 
         <View style={styles.recordSectionHeader}>
-          <Text style={styles.sectionTitle}>最近记录</Text>
+          <Text style={styles.sectionTitle}>最近的记录</Text>
           <Text style={styles.recordCount}>{records.length} 条</Text>
         </View>
 
