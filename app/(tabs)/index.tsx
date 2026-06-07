@@ -86,6 +86,9 @@ export default function TodayScreen() {
     await saveUserRole(nextRole);
   }
 
+  const today = formatDate(new Date());
+  const cycleSummary = useMemo(() => computeCycleSummary(records, today), [records, today]);
+
   if (!content) {
     return (
       <Screen>
@@ -96,11 +99,9 @@ export default function TodayScreen() {
     );
   }
 
-  const today = formatDate(new Date());
   const homeModel = getHomeModel(content.role);
   const quickOptions = homeModel.quickKinds.map((kind) => getRecordOption(content.role, kind));
   const completedCount = quickOptions.filter((option) => getTodayRecordValue(records, option.kind, today)).length;
-  const cycleSummary = useMemo(() => computeCycleSummary(records, today), [records, today]);
   const heroCopy = buildHeroCopy(content.role, cycleSummary, summarySource, {
     fallbackLabel: content.heroLabel,
     fallbackPhase: content.heroPhase
