@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import type { User } from "@supabase/supabase-js";
 import type { UserRole } from "@/domain/userRole";
 import { getRoleContent } from "@/domain/userRole";
@@ -31,6 +31,7 @@ type PromptGroup = {
 
 export default function CoachScreen() {
   const params = useLocalSearchParams<{ prompt?: string }>();
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [role, setRole] = useState<UserRole | null>("female");
   const [isConfigured, setIsConfigured] = useState(true);
@@ -147,6 +148,15 @@ export default function CoachScreen() {
     } finally {
       setIsSending(false);
     }
+  }
+
+  function handleInputAction() {
+    if (!user) {
+      router.push("/profile");
+      return;
+    }
+
+    sendQuestion();
   }
 
   return (
@@ -278,9 +288,9 @@ export default function CoachScreen() {
             returnKeyType="send"
             onSubmitEditing={() => sendQuestion()}
           />
-          <Pressable disabled={!user || isSending || !question.trim()} onPress={() => sendQuestion()}>
-            <Text style={[styles.send, (!user || isSending || !question.trim()) && styles.sendDisabled]}>
-              {isSending ? "发送中" : "发送"}
+          <Pressable disabled={Boolean(user) && (isSending || !question.trim())} onPress={handleInputAction}>
+            <Text style={[styles.send, Boolean(user) && (isSending || !question.trim()) && styles.sendDisabled]}>
+              {!user ? "登录" : isSending ? "发送中" : "发送"}
             </Text>
           </Pressable>
         </View>

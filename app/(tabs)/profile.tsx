@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
-import { Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import type { User } from "@supabase/supabase-js";
 import { getPlanLimits } from "@/domain/entitlements";
 import { formatRenewalDate, SUBSCRIPTION_FEATURES } from "@/domain/subscription";
 import type { UserRole } from "@/domain/userRole";
 import { ROLE_CONTENT } from "@/domain/userRole";
-import { formatAuthError, getAuthSnapshot, signInWithEmail, signOut, signUpWithEmail, subscribeToAuthChanges } from "@/services/auth";
+import { deleteAccount, formatAuthError, getAuthSnapshot, signInWithEmail, signOut, signUpWithEmail, subscribeToAuthChanges } from "@/services/auth";
 import { getAiUsageToday, getEntitlement } from "@/services/cloudSync";
 import {
   getSubscriptionState,
@@ -20,6 +20,12 @@ import { colors, radius, spacing, typography } from "@/ui/tokens";
 
 const proLimits = getPlanLimits("pro");
 
+const legalLinks = [
+  { label: "隐私政策", url: "https://example.com/nurture/privacy" },
+  { label: "服务条款", url: "https://example.com/nurture/terms" },
+  { label: "订阅条款", url: "https://example.com/nurture/subscription-terms" }
+];
+
 export default function ProfileScreen() {
   const [user, setUser] = useState<User | null>(null);
   const [isConfigured, setIsConfigured] = useState(true);
@@ -32,6 +38,7 @@ export default function ProfileScreen() {
   const [aiUsage, setAiUsage] = useState(0);
   const [subscription, setSubscription] = useState<SubscriptionState | null>(null);
   const [isSubscriptionBusy, setIsSubscriptionBusy] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [cloudSyncEnabled, setCloudSyncEnabled] = useState(true);
   const [aiContextEnabled, setAiContextEnabled] = useState(true);
   const [healthWriteEnabled, setHealthWriteEnabled] = useState(false);
@@ -198,6 +205,42 @@ export default function ProfileScreen() {
     await Linking.openURL(subscription.managementUrl);
   }
 
+  function confirmDeleteAccount() {
+    if (!user) {
+      setError("请先登录，再删除账号。");
+      return;
+    }
+
+    Alert.alert(
+      "删除账号",
+      "删除后会移除你的云端账号、周期记录、AI 对话、用量和订阅权益记录。此操作不可恢复。",
+      [
+        { text: "取消", style: "cancel" },
+        {
+          text: "确认删除",
+          style: "destructive",
+          onPress: handleDeleteAccount
+        }
+      ]
+    );
+  }
+
+  async function handleDeleteAccount() {
+    setIsDeletingAccount(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      await deleteAccount();
+      setUser(null);
+      setMessage("账号和云端数据已删除。");
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "删除账号失败。");
+    } finally {
+      setIsDeletingAccount(false);
+    }
+  }
+
   return (
     <Screen title="隐私与订阅">
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
@@ -360,9 +403,28 @@ export default function ProfileScreen() {
           onChange={setHealthWriteEnabled}
         />
 
+        <View style={styles.legalCard}>
+          <Text style={styles.legalTitle}>上架合规</Text>
+          <Text style={styles.legalBody}>App Store 上架前需要把这些链接替换成正式网页 URL，并在 App Store Connect 中填写隐私标签。</Text>
+          <View style={styles.legalLinks}>
+            {legalLinks.map((item) => (
+              <Pressable key={item.label} onPress={() => Linking.openURL(item.url)} style={styles.legalLink}>
+                <Text style={styles.legalLinkText}>{item.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+
         <View style={styles.danger}>
           <Text style={styles.dangerTitle}>数据控制</Text>
-          <Text style={styles.dangerBody}>支持导出本地数据、删除云端资料、关闭 AI 授权。</Text>
+          <Text style={styles.dangerBody}>你可以关闭 AI 授权，也可以删除账号和云端数据。删除账号不会自动取消 App Store 或 Google Play 订阅，请先在订阅管理中取消。</Text>
+          <Pressable
+            disabled={!user || isDeletingAccount}
+            onPress={confirmDeleteAccount}
+            style={[styles.deleteButton, (!user || isDeletingAccount) && styles.disabledButton]}
+          >
+            <Text style={styles.deleteButtonText}>{isDeletingAccount ? "删除中" : "删除账号"}</Text>
+          </Pressable>
         </View>
       </ScrollView>
     </Screen>
@@ -650,6 +712,40 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.text
   },
+  legalCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    gap: spacing.sm,
+    marginTop: spacing.md,
+    padding: spacing.md
+  },
+  legalTitle: {
+    ...typography.section,
+    color: colors.ink
+  },
+  legalBody: {
+    ...typography.body,
+    color: colors.text
+  },
+  legalLinks: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm
+  },
+  legalLink: {
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 8
+  },
+  legalLinkText: {
+    color: colors.coral,
+    fontSize: 13,
+    fontWeight: "900"
+  },
   danger: {
     backgroundColor: colors.blush,
     borderRadius: radius.md,
@@ -663,6 +759,18 @@ const styles = StyleSheet.create({
   },
   dangerBody: {
     ...typography.body,
-    color: colors.text
+    color: colors.text,
+    marginBottom: spacing.md
+  },
+  deleteButton: {
+    alignItems: "center",
+    backgroundColor: colors.coral,
+    borderRadius: radius.sm,
+    padding: spacing.md
+  },
+  deleteButtonText: {
+    color: colors.surface,
+    fontSize: 15,
+    fontWeight: "900"
   }
 });

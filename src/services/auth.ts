@@ -89,3 +89,16 @@ export async function signOut() {
     throw error;
   }
 }
+
+export async function deleteAccount() {
+  const client = requireSupabase();
+  const { error } = await client.functions.invoke("delete-account", {
+    body: {}
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  await client.auth.signOut();
+}
