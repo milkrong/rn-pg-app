@@ -220,6 +220,7 @@ export type Database = {
           display_name: string | null
           id: string
           locale: string
+          role: string | null
           updated_at: string
         }
         Insert: {
@@ -227,6 +228,7 @@ export type Database = {
           display_name?: string | null
           id: string
           locale?: string
+          role?: string | null
           updated_at?: string
         }
         Update: {
@@ -234,6 +236,7 @@ export type Database = {
           display_name?: string | null
           id?: string
           locale?: string
+          role?: string | null
           updated_at?: string
         }
         Relationships: []

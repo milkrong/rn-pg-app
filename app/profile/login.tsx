@@ -3,6 +3,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import type { User } from "@supabase/supabase-js";
+import type { UserRole } from "@/domain/userRole";
 import {
   deleteAccount,
   formatAuthError,
@@ -12,6 +13,7 @@ import {
   signUpWithEmail,
   subscribeToAuthChanges
 } from "@/services/auth";
+import { confirmRoleAtSignup, pullRoleFromCloud } from "@/services/userRolePreference";
 import { Screen } from "@/ui/Screen";
 import { colors, radius, spacing, typography } from "@/ui/tokens";
 
@@ -21,6 +23,7 @@ export default function LoginScreen() {
   const [isConfigured, setIsConfigured] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [signupRole, setSignupRole] = useState<UserRole | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -51,6 +54,11 @@ export default function LoginScreen() {
   }, []);
 
   async function submitAuth(mode: "sign-in" | "sign-up") {
+    if (mode === "sign-up" && !signupRole) {
+      setError("注册前请先选择身份。");
+      return;
+    }
+
     setIsSubmitting(true);
     setError(null);
     setMessage(null);
@@ -59,11 +67,21 @@ export default function LoginScreen() {
       if (mode === "sign-in") {
         const nextUser = await signInWithEmail({ email: email.trim(), password });
         setUser(nextUser);
+        await pullRoleFromCloud();
         setMessage("登录成功。");
       } else {
         const result = await signUpWithEmail({ email: email.trim(), password });
         setUser(result.user);
+        if (result.user && signupRole) {
+          try {
+            await confirmRoleAtSignup(signupRole);
+          } catch (roleError) {
+            setError(roleError instanceof Error ? roleError.message : "身份保存失败，请重新登录后再试。");
+            return;
+          }
+        }
         setMessage(result.needsEmailConfirmation ? "注册成功，请先完成邮箱确认。" : "注册并登录成功。");
+        setSignupRole(null);
       }
     } catch (authError) {
       setError(formatAuthError(authError));
@@ -196,6 +214,30 @@ export default function LoginScreen() {
               textContentType="password"
               value={password}
             />
+
+            <View style={styles.roleBlock}>
+              <View style={styles.roleHeaderRow}>
+                <Text style={styles.roleHeading}>注册身份</Text>
+                <Text style={styles.roleHint}>确认后不可修改</Text>
+              </View>
+              <View style={styles.roleRow}>
+                <Pressable
+                  disabled={isSubmitting}
+                  onPress={() => setSignupRole("female")}
+                  style={[styles.roleChip, signupRole === "female" && styles.roleChipActive]}
+                >
+                  <Text style={[styles.roleChipText, signupRole === "female" && styles.roleChipTextActive]}>女生</Text>
+                </Pressable>
+                <Pressable
+                  disabled={isSubmitting}
+                  onPress={() => setSignupRole("male")}
+                  style={[styles.roleChip, signupRole === "male" && styles.roleChipActive]}
+                >
+                  <Text style={[styles.roleChipText, signupRole === "male" && styles.roleChipTextActive]}>男生</Text>
+                </Pressable>
+              </View>
+            </View>
+
             <View style={styles.authActions}>
               <Pressable
                 disabled={isSubmitting}
@@ -209,11 +251,11 @@ export default function LoginScreen() {
                 <Text style={styles.primaryButtonText}>{isSubmitting ? "处理中" : "登录"}</Text>
               </Pressable>
               <Pressable
-                disabled={isSubmitting}
+                disabled={isSubmitting || !signupRole}
                 onPress={() => submitAuth("sign-up")}
                 style={({ pressed }) => [
                   styles.secondaryButton,
-                  isSubmitting && styles.disabled,
+                  (isSubmitting || !signupRole) && styles.disabled,
                   pressed && styles.pressed
                 ]}
               >
@@ -289,6 +331,49 @@ const styles = StyleSheet.create({
     fontSize: 15,
     minHeight: 46,
     paddingHorizontal: spacing.md
+  },
+  roleBlock: {
+    gap: 8
+  },
+  roleHeaderRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between"
+  },
+  roleHeading: {
+    color: colors.ink,
+    fontSize: 13,
+    fontWeight: "900"
+  },
+  roleHint: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "800"
+  },
+  roleRow: {
+    flexDirection: "row",
+    gap: spacing.sm
+  },
+  roleChip: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    flex: 1,
+    paddingVertical: 12
+  },
+  roleChipActive: {
+    backgroundColor: colors.coral,
+    borderColor: colors.coral
+  },
+  roleChipText: {
+    color: colors.ink,
+    fontSize: 14,
+    fontWeight: "900"
+  },
+  roleChipTextActive: {
+    color: colors.surface
   },
   authActions: {
     flexDirection: "row",

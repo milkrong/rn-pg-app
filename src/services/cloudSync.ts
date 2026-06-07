@@ -63,6 +63,37 @@ export async function updateProfile(profile: BackendProfile): Promise<ProfileRow
   return data;
 }
 
+export type ProfileRole = "female" | "male";
+
+export async function getProfileRole(): Promise<ProfileRole | null> {
+  const supabase = requireSupabase();
+  const userId = await getCurrentUserId();
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  const role = data?.role ?? null;
+  return role === "female" || role === "male" ? role : null;
+}
+
+export async function setProfileRole(role: ProfileRole): Promise<void> {
+  const supabase = requireSupabase();
+  const userId = await getCurrentUserId();
+  const { error } = await supabase
+    .from("profiles")
+    .upsert({ id: userId, role }, { onConflict: "id" });
+
+  if (error) {
+    throw error;
+  }
+}
+
 export async function listCycleLogs(fromDate?: string): Promise<CycleLogRow[]> {
   const supabase = requireSupabase();
   let query = supabase.from("cycle_logs").select("*").order("happened_on", { ascending: false });

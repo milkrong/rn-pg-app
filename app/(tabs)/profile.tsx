@@ -6,6 +6,7 @@ import type { User } from "@supabase/supabase-js";
 import type { UserRole } from "@/domain/userRole";
 import { ROLE_CONTENT } from "@/domain/userRole";
 import { getAuthSnapshot, subscribeToAuthChanges } from "@/services/auth";
+import { getProfileRole } from "@/services/cloudSync";
 import { getUserRole, saveUserRole, subscribeUserRole } from "@/services/userRolePreference";
 import { Screen } from "@/ui/Screen";
 import { colors, radius, spacing, typography } from "@/ui/tokens";
@@ -25,6 +26,7 @@ export default function ProfileScreen() {
   const [aiContextEnabled, setAiContextEnabled] = useState(true);
   const [healthWriteEnabled, setHealthWriteEnabled] = useState(false);
   const [role, setRole] = useState<UserRole | null>(null);
+  const [roleLocked, setRoleLocked] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -64,7 +66,32 @@ export default function ProfileScreen() {
     };
   }, []);
 
+  useEffect(() => {
+    let isMounted = true;
+    if (!user) {
+      setRoleLocked(false);
+      return;
+    }
+    getProfileRole()
+      .then((serverRole) => {
+        if (isMounted) {
+          setRoleLocked(Boolean(serverRole));
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setRoleLocked(false);
+        }
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
+
   async function chooseRole(nextRole: UserRole) {
+    if (roleLocked) {
+      return;
+    }
     setRole(nextRole);
     await saveUserRole(nextRole);
   }
@@ -102,23 +129,34 @@ export default function ProfileScreen() {
         <View style={styles.roleCard}>
           <View style={styles.roleHeader}>
             <Text style={styles.roleTitle}>我的模式</Text>
-            <View style={styles.roleSegment}>
-              <Pressable
-                onPress={() => chooseRole("female")}
-                style={[styles.roleSegmentItem, role === "female" && styles.roleSegmentItemActive]}
-              >
-                <Text style={[styles.roleSegmentText, role === "female" && styles.roleSegmentTextActive]}>女生</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => chooseRole("male")}
-                style={[styles.roleSegmentItem, role === "male" && styles.roleSegmentItemActive]}
-              >
-                <Text style={[styles.roleSegmentText, role === "male" && styles.roleSegmentTextActive]}>男生</Text>
-              </Pressable>
-            </View>
+            {roleLocked && role ? (
+              <View style={styles.roleLockedBadge}>
+                <Ionicons name="lock-closed" color={colors.muted} size={12} />
+                <Text style={styles.roleLockedBadgeText}>{ROLE_CONTENT[role].label}</Text>
+              </View>
+            ) : (
+              <View style={styles.roleSegment}>
+                <Pressable
+                  onPress={() => chooseRole("female")}
+                  style={[styles.roleSegmentItem, role === "female" && styles.roleSegmentItemActive]}
+                >
+                  <Text style={[styles.roleSegmentText, role === "female" && styles.roleSegmentTextActive]}>女生</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => chooseRole("male")}
+                  style={[styles.roleSegmentItem, role === "male" && styles.roleSegmentItemActive]}
+                >
+                  <Text style={[styles.roleSegmentText, role === "male" && styles.roleSegmentTextActive]}>男生</Text>
+                </Pressable>
+              </View>
+            )}
           </View>
           <Text style={styles.roleBody}>
-            {role ? `当前是${ROLE_CONTENT[role].label}模式，切换后页面内容会跟着变。` : "选择身份，页面会跟着变。"}
+            {roleLocked && role
+              ? "注册时已确认，无法修改。"
+              : role
+                ? `当前是${ROLE_CONTENT[role].label}模式，切换后页面内容会跟着变。`
+                : "选择身份，页面会跟着变。"}
           </Text>
         </View>
 
@@ -311,6 +349,22 @@ const styles = StyleSheet.create({
   },
   roleSegmentTextActive: {
     color: colors.surface
+  },
+  roleLockedBadge: {
+    alignItems: "center",
+    backgroundColor: colors.background,
+    borderColor: colors.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6
+  },
+  roleLockedBadgeText: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: "900"
   },
   settingsGroup: {
     backgroundColor: colors.surface,
