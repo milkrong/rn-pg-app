@@ -172,6 +172,13 @@ export default function CycleScreen() {
             </View>
           </View>
           <Text style={styles.statusBody}>{content?.cyclePanelBody}</Text>
+          {activeRole === "female" && cycleSummary ? (
+            <Text style={styles.cycleStats}>
+              {cycleSummary.sampleCycles > 0
+                ? `周期长度约 ${cycleSummary.averageCycleLength} 天（取自你最近 ${cycleSummary.sampleCycles} 个周期）`
+                : `周期长度按 ${cycleSummary.averageCycleLength} 天估算，多记几次会更准`}
+            </Text>
+          ) : null}
           <View style={styles.recommendation}>
             <Ionicons name="sparkles-outline" color={colors.coral} size={17} />
             <Text style={styles.recommendationText}>推荐先记：{recommendedOption.label}</Text>
@@ -335,6 +342,12 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "800",
     marginTop: 2
+  },
+  cycleStats: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: "800",
+    marginTop: 4
   },
   recommendation: {
     alignItems: "center",

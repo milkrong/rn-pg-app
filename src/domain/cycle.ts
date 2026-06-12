@@ -91,20 +91,70 @@ export type ComputedCycleSummary = {
   phase: CyclePhase;
   recentSymptoms: string[];
   latestPeriodStart: string;
+  averageCycleLength: number;
+  averagePeriodLength: number;
+  /** Number of full cycle gaps observed; >=1 means we inferred from history. */
+  sampleCycles: number;
 };
+
+export type InferredCycleAverages = {
+  averageCycleLength: number;
+  averagePeriodLength: number;
+  /** Periods detected, sorted DESC by start day. */
+  periodStretches: Array<{ start: string; length: number }>;
+  /** Number of cycle gaps we trusted (after filtering implausible outliers). */
+  sampleCycles: number;
+};
+
+const MIN_PLAUSIBLE_CYCLE = 18;
+const MAX_PLAUSIBLE_CYCLE = 60;
+
+/**
+ * Infers per-user cycle length and period length from the actual records,
+ * falling back to defaults when there isn't enough history to be confident.
+ * Cycle length uses the median of recent gaps (robust to one missed cycle),
+ * filtered to a plausible range.
+ */
+export function inferCycleAverages(records: AppCycleLog[]): InferredCycleAverages {
+  const stretches = findPeriodStretches(records);
+
+  const periodLengths = stretches.map((s) => s.length).filter((length) => length >= 1 && length <= 12);
+  const averagePeriodLength =
+    periodLengths.length > 0 ? Math.round(median(periodLengths)) : DEFAULT_PERIOD_LENGTH;
+
+  const sortedAsc = [...stretches].sort((a, b) => a.start.localeCompare(b.start));
+  const gaps: number[] = [];
+  for (let i = 1; i < sortedAsc.length; i += 1) {
+    const gap = daysBetween(sortedAsc[i - 1].start, sortedAsc[i].start);
+    if (gap >= MIN_PLAUSIBLE_CYCLE && gap <= MAX_PLAUSIBLE_CYCLE) {
+      gaps.push(gap);
+    }
+  }
+  const recentGaps = gaps.slice(-6);
+  const averageCycleLength =
+    recentGaps.length > 0 ? Math.round(median(recentGaps)) : DEFAULT_CYCLE_LENGTH;
+
+  return {
+    averageCycleLength,
+    averagePeriodLength,
+    periodStretches: stretches,
+    sampleCycles: recentGaps.length
+  };
+}
 
 export function computeCycleSummary(
   records: AppCycleLog[],
   today: string,
   options?: { averageCycleLength?: number; averagePeriodLength?: number }
 ): ComputedCycleSummary | null {
-  const latestPeriodStart = findLatestPeriodStart(records);
+  const inferred = inferCycleAverages(records);
+  const latestPeriodStart = inferred.periodStretches[0]?.start ?? null;
   if (!latestPeriodStart) {
     return null;
   }
 
-  const averageCycleLength = options?.averageCycleLength ?? DEFAULT_CYCLE_LENGTH;
-  const averagePeriodLength = options?.averagePeriodLength ?? DEFAULT_PERIOD_LENGTH;
+  const averageCycleLength = options?.averageCycleLength ?? inferred.averageCycleLength;
+  const averagePeriodLength = options?.averagePeriodLength ?? inferred.averagePeriodLength;
   const estimate = estimateCycle({
     today,
     latestPeriodStart,
@@ -118,8 +168,47 @@ export function computeCycleSummary(
     fertileWindowLabel: formatFertileWindow(estimate.fertileWindow),
     phase: estimate.phase,
     recentSymptoms: collectRecentSymptoms(records, today),
-    latestPeriodStart
+    latestPeriodStart,
+    averageCycleLength,
+    averagePeriodLength,
+    sampleCycles: inferred.sampleCycles
   };
+}
+
+function median(values: number[]): number {
+  if (values.length === 0) {
+    return 0;
+  }
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+}
+
+function findPeriodStretches(records: AppCycleLog[]): Array<{ start: string; length: number }> {
+  const dates = new Set(
+    records.filter((record) => isPeriodRecord(record)).map((record) => record.happenedOn)
+  );
+  if (dates.size === 0) {
+    return [];
+  }
+
+  const sortedAsc = Array.from(dates).sort();
+  const stretches: Array<{ start: string; length: number }> = [];
+
+  for (const date of sortedAsc) {
+    if (dates.has(addDays(date, -1))) {
+      continue;
+    }
+    let length = 1;
+    let next = addDays(date, 1);
+    while (dates.has(next)) {
+      length += 1;
+      next = addDays(next, 1);
+    }
+    stretches.push({ start: date, length });
+  }
+
+  return stretches.sort((a, b) => b.start.localeCompare(a.start));
 }
 
 export function formatFertileWindow(window: FertileWindow): string {
@@ -129,25 +218,6 @@ export function formatFertileWindow(window: FertileWindow): string {
 function formatChineseDate(value: string): string {
   const date = parseDate(value);
   return `${date.getUTCMonth() + 1}月${date.getUTCDate()}日`;
-}
-
-function findLatestPeriodStart(records: AppCycleLog[]): string | null {
-  const periodDates = new Set(
-    records
-      .filter((record) => isPeriodRecord(record))
-      .map((record) => record.happenedOn)
-  );
-
-  if (periodDates.size === 0) {
-    return null;
-  }
-
-  const sortedDates = Array.from(periodDates).sort((a, b) => b.localeCompare(a));
-  let start = sortedDates[0];
-  while (periodDates.has(addDays(start, -1))) {
-    start = addDays(start, -1);
-  }
-  return start;
 }
 
 function isPeriodRecord(record: AppCycleLog): boolean {
