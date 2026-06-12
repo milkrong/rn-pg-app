@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { computeCycleSummary, getFemalePhaseRelevance } from "@/domain/cycle";
 import { formatDate } from "@/domain/date";
 import type { AppCycleLog, RecordKind } from "@/domain/records";
 import { formatRecordDetail, formatRecordTitle, getRecordOption, getRecordOptions } from "@/domain/records";
@@ -24,7 +25,26 @@ export default function CycleScreen() {
   const content = getRoleContent(role) ?? getRoleContent("female");
   const activeRole = role ?? "female";
   const today = formatDate(new Date());
-  const recordOptions = useMemo(() => getRecordOptions(activeRole), [activeRole]);
+  const cycleSummary = useMemo(
+    () => (activeRole === "female" ? computeCycleSummary(records, today) : null),
+    [activeRole, records, today]
+  );
+  const phaseRelevance = useMemo(
+    () => (activeRole === "female" && cycleSummary ? getFemalePhaseRelevance(cycleSummary.phase) : null),
+    [activeRole, cycleSummary]
+  );
+  const recordOptions = useMemo(() => {
+    const all = getRecordOptions(activeRole);
+    if (!phaseRelevance) {
+      return all;
+    }
+    const order = new Map(phaseRelevance.visible.map((kind, index) => [kind, index]));
+    return all
+      .filter((option) => order.has(option.kind))
+      .sort((a, b) => (order.get(a.kind) ?? 99) - (order.get(b.kind) ?? 99));
+  }, [activeRole, phaseRelevance]);
+  const recommendedKind: RecordKind = phaseRelevance?.primary ?? getRecommendedKind(activeRole);
+  const recommendedOption = getRecordOption(activeRole, recommendedKind);
   const selectedOption = getRecordOption(activeRole, selectedKind);
   const completedToday = recordOptions.filter((option) => getTodayRecordValue(records, option.kind, today)).length;
   const recordGroups = useMemo(
@@ -67,11 +87,11 @@ export default function CycleScreen() {
 
   useEffect(() => {
     if (!recordOptions.some((option) => option.kind === selectedKind)) {
-      setSelectedKind(getRecommendedKind(activeRole));
+      setSelectedKind(recommendedKind);
       setSelectedValue("");
       setNote("");
     }
-  }, [activeRole, recordOptions, selectedKind]);
+  }, [recommendedKind, recordOptions, selectedKind]);
 
   useEffect(() => {
     let isMounted = true;
@@ -154,7 +174,7 @@ export default function CycleScreen() {
           <Text style={styles.statusBody}>{content?.cyclePanelBody}</Text>
           <View style={styles.recommendation}>
             <Ionicons name="sparkles-outline" color={colors.coral} size={17} />
-            <Text style={styles.recommendationText}>推荐先记：{getRecordOption(activeRole, getRecommendedKind(activeRole)).label}</Text>
+            <Text style={styles.recommendationText}>推荐先记：{recommendedOption.label}</Text>
           </View>
         </View>
 

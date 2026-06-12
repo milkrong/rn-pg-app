@@ -4,6 +4,7 @@ import {
   estimateCycle,
   formatCycleDayLabel,
   formatFertileWindow,
+  getFemalePhaseRelevance,
   getTodayTasks
 } from "./cycle";
 import type { AppCycleLog } from "./records";
@@ -62,6 +63,20 @@ describe("cycle domain", () => {
     expect(
       formatFertileWindow({ startsOn: "2026-06-06", peaksOn: "2026-06-10", endsOn: "2026-06-11" })
     ).toBe("6月6日-6月11日");
+  });
+
+  it("hides ovulation tests during the period and period flow outside of it", () => {
+    const periodRelevance = getFemalePhaseRelevance("period");
+    expect(periodRelevance.primary).toBe("period");
+    expect(periodRelevance.visible).not.toContain("ovulation_test");
+
+    const fertileRelevance = getFemalePhaseRelevance("fertile");
+    expect(fertileRelevance.primary).toBe("ovulation_test");
+    expect(fertileRelevance.visible).not.toContain("period");
+
+    const lutealRelevance = getFemalePhaseRelevance("luteal");
+    expect(lutealRelevance.visible).not.toContain("period");
+    expect(lutealRelevance.visible).not.toContain("ovulation_test");
   });
 
   it("prioritizes LH and temperature tasks around the fertile window", () => {

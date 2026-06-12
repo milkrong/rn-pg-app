@@ -1,5 +1,5 @@
 import { addDays, daysBetween, isWithin, parseDate } from "./date";
-import type { AppCycleLog } from "./records";
+import type { AppCycleLog, RecordKind } from "./records";
 
 export const DEFAULT_CYCLE_LENGTH = 28;
 export const DEFAULT_PERIOD_LENGTH = 5;
@@ -61,6 +61,28 @@ export function estimateCycle(input: CycleInput): CycleEstimate {
 export function formatCycleDayLabel(cycleDay: number): string {
   return `周期第 ${cycleDay} 天`;
 }
+
+/**
+ * Female-only: orders the record kinds that are meaningful in each cycle phase.
+ * Anything not listed in `visible` is hidden because logging it during that
+ * phase doesn't make biological sense (e.g. LH testing during a period, or
+ * logging period flow when she's not bleeding).
+ */
+export function getFemalePhaseRelevance(phase: CyclePhase): {
+  visible: RecordKind[];
+  primary: RecordKind;
+} {
+  const visible = FEMALE_PHASE_RECORD_ORDER[phase];
+  return { visible, primary: visible[0] };
+}
+
+const FEMALE_PHASE_RECORD_ORDER: Record<CyclePhase, RecordKind[]> = {
+  period: ["period", "symptom", "temperature", "intercourse", "supplement"],
+  follicular: ["temperature", "symptom", "intercourse", "ovulation_test", "supplement"],
+  "fertile-soon": ["ovulation_test", "temperature", "intercourse", "symptom", "supplement"],
+  fertile: ["ovulation_test", "intercourse", "temperature", "symptom", "supplement"],
+  luteal: ["symptom", "temperature", "intercourse", "supplement"]
+};
 
 export type ComputedCycleSummary = {
   cycleDay: number;

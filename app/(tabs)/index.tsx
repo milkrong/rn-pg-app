@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import type { User } from "@supabase/supabase-js";
-import { computeCycleSummary, type ComputedCycleSummary, type CyclePhase } from "@/domain/cycle";
+import { computeCycleSummary, getFemalePhaseRelevance, type ComputedCycleSummary, type CyclePhase } from "@/domain/cycle";
 import { formatDate } from "@/domain/date";
 import type { AppCycleLog, RecordKind, RecordOption } from "@/domain/records";
 import { getRecordOption, getRecordOptions } from "@/domain/records";
@@ -100,8 +100,17 @@ export default function TodayScreen() {
   }
 
   const homeModel = getHomeModel(content.role);
-  const quickOptions = homeModel.quickKinds.map((kind) => getRecordOption(content.role, kind));
+  const phaseKinds =
+    content.role === "female" && cycleSummary
+      ? getFemalePhaseRelevance(cycleSummary.phase).visible
+      : null;
+  const effectiveQuickKinds = phaseKinds ? phaseKinds.slice(0, 4) : homeModel.quickKinds;
+  const primaryKind = phaseKinds?.[0] ?? homeModel.primaryKind;
+  const secondaryKind = phaseKinds?.[1] ?? homeModel.secondaryKind;
+  const quickOptions = effectiveQuickKinds.map((kind) => getRecordOption(content.role, kind));
   const completedCount = quickOptions.filter((option) => getTodayRecordValue(records, option.kind, today)).length;
+  const primaryAction = phaseKinds ? `记录${getRecordOption(content.role, primaryKind).label}` : homeModel.primaryAction;
+  const secondaryAction = phaseKinds ? `记录${getRecordOption(content.role, secondaryKind).label}` : homeModel.secondaryAction;
   const heroCopy = buildHeroCopy(content.role, cycleSummary, summarySource, {
     fallbackLabel: content.heroLabel,
     fallbackPhase: content.heroPhase
@@ -130,16 +139,16 @@ export default function TodayScreen() {
           <View style={styles.heroActions}>
             <Pressable
               style={styles.primaryAction}
-              onPress={() => router.push({ pathname: "/cycle", params: { recordKind: homeModel.primaryKind } })}
+              onPress={() => router.push({ pathname: "/cycle", params: { recordKind: primaryKind } })}
             >
               <Ionicons name="add-circle-outline" color={colors.surface} size={19} />
-              <Text style={styles.primaryActionText}>{homeModel.primaryAction}</Text>
+              <Text style={styles.primaryActionText}>{primaryAction}</Text>
             </Pressable>
             <Pressable
               style={styles.secondaryAction}
-              onPress={() => router.push({ pathname: "/cycle", params: { recordKind: homeModel.secondaryKind } })}
+              onPress={() => router.push({ pathname: "/cycle", params: { recordKind: secondaryKind } })}
             >
-              <Text style={styles.secondaryActionText}>{homeModel.secondaryAction}</Text>
+              <Text style={styles.secondaryActionText}>{secondaryAction}</Text>
             </Pressable>
           </View>
         </LinearGradient>
