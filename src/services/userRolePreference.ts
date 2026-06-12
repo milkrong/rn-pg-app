@@ -5,13 +5,31 @@ import { loadJson, saveJson } from "./localStore";
 
 const USER_ROLE_KEY = "user-role";
 const listeners = new Set<(role: UserRole | null) => void>();
+let cachedRole: UserRole | null = null;
+
+/**
+ * Synchronous best-effort read of the cached role. Returns null until the
+ * async getUserRole / saveUserRole / pullRoleFromCloud has populated the
+ * cache. Components can use it to seed useState so a saved role doesn't
+ * flicker from "not selected" to "selected" on every mount.
+ */
+export function getCachedUserRole(): UserRole | null {
+  return cachedRole;
+}
 
 export async function getUserRole(): Promise<UserRole | null> {
+  if (cachedRole) {
+    return cachedRole;
+  }
   const value = await loadJson<UserRole>(USER_ROLE_KEY);
-  return value === "female" || value === "male" ? value : null;
+  if (value === "female" || value === "male") {
+    cachedRole = value;
+  }
+  return cachedRole;
 }
 
 export async function saveUserRole(role: UserRole): Promise<void> {
+  cachedRole = role;
   await saveJson(USER_ROLE_KEY, role);
   listeners.forEach((listener) => listener(role));
 }

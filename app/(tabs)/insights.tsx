@@ -5,7 +5,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import type { UserRole } from "@/domain/userRole";
 import { getRoleContent } from "@/domain/userRole";
-import { getUserRole, subscribeUserRole } from "@/services/userRolePreference";
+import { getCachedUserRole, getUserRole, subscribeUserRole } from "@/services/userRolePreference";
 import { Screen } from "@/ui/Screen";
 import { colors, radius, spacing, typography } from "@/ui/tokens";
 
@@ -28,7 +28,7 @@ const ranges: Array<{ key: InsightRange; label: string }> = [
 
 export default function InsightsScreen() {
   const router = useRouter();
-  const [role, setRole] = useState<UserRole | null>("female");
+  const [role, setRole] = useState<UserRole | null>(() => getCachedUserRole() ?? "female");
   const [range, setRange] = useState<InsightRange>("cycle");
   const content = getRoleContent(role) ?? getRoleContent("female");
   const model = useMemo(() => getInsightModel(role ?? "female", range), [role, range]);

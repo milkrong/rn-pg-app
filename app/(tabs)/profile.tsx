@@ -7,7 +7,7 @@ import type { UserRole } from "@/domain/userRole";
 import { ROLE_CONTENT } from "@/domain/userRole";
 import { getAuthSnapshot, subscribeToAuthChanges } from "@/services/auth";
 import { getProfileRole } from "@/services/cloudSync";
-import { getUserRole, saveUserRole, subscribeUserRole } from "@/services/userRolePreference";
+import { getCachedUserRole, getUserRole, saveUserRole, subscribeUserRole } from "@/services/userRolePreference";
 import { Screen } from "@/ui/Screen";
 import { colors, radius, spacing, typography } from "@/ui/tokens";
 
@@ -25,7 +25,7 @@ export default function ProfileScreen() {
   const [cloudSyncEnabled, setCloudSyncEnabled] = useState(true);
   const [aiContextEnabled, setAiContextEnabled] = useState(true);
   const [healthWriteEnabled, setHealthWriteEnabled] = useState(false);
-  const [role, setRole] = useState<UserRole | null>(null);
+  const [role, setRole] = useState<UserRole | null>(() => getCachedUserRole());
   const [roleLocked, setRoleLocked] = useState(false);
 
   useEffect(() => {

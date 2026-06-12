@@ -30,7 +30,7 @@ import {
   type CoachAnswer
 } from "@/services/aiCoach";
 import { loadCycleSourceRecords } from "@/services/cycleSummarySource";
-import { getUserRole, subscribeUserRole } from "@/services/userRolePreference";
+import { getCachedUserRole, getUserRole, subscribeUserRole } from "@/services/userRolePreference";
 import { Screen } from "@/ui/Screen";
 import { TypingDots } from "@/ui/TypingDots";
 import { colors, radius, spacing, typography } from "@/ui/tokens";
@@ -68,7 +68,7 @@ export default function CoachScreen() {
   const hasAutoCollapsedRef = useRef(false);
 
   const [user, setUser] = useState<User | null>(null);
-  const [role, setRole] = useState<UserRole | null>("female");
+  const [role, setRole] = useState<UserRole | null>(() => getCachedUserRole() ?? "female");
   const [isConfigured, setIsConfigured] = useState(true);
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([starterMessage]);

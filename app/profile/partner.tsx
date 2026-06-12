@@ -16,14 +16,14 @@ import {
   getPartnerProfile,
   type Partnership
 } from "@/services/partner";
-import { getUserRole, subscribeUserRole } from "@/services/userRolePreference";
+import { getCachedUserRole, getUserRole, subscribeUserRole } from "@/services/userRolePreference";
 import { Screen } from "@/ui/Screen";
 import { colors, radius, spacing, typography } from "@/ui/tokens";
 
 export default function PartnerScreen() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
-  const [role, setRole] = useState<UserRole | null>(null);
+  const [role, setRole] = useState<UserRole | null>(() => getCachedUserRole());
   const [partnership, setPartnership] = useState<Partnership | null>(null);
   const [partnerName, setPartnerName] = useState<string | null>(null);
   const [code, setCode] = useState("");

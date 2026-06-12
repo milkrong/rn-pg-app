@@ -12,7 +12,7 @@ import type { UserRole } from "@/domain/userRole";
 import { getRoleContent } from "@/domain/userRole";
 import { getAuthSnapshot, subscribeToAuthChanges } from "@/services/auth";
 import { loadCycleSourceRecords, type CycleSummarySource } from "@/services/cycleSummarySource";
-import { getUserRole, saveUserRole, subscribeUserRole } from "@/services/userRolePreference";
+import { getCachedUserRole, getUserRole, saveUserRole, subscribeUserRole } from "@/services/userRolePreference";
 import { QuickLogButton } from "@/ui/QuickLogButton";
 import { RoleGate } from "@/ui/RoleGate";
 import { Screen } from "@/ui/Screen";
@@ -20,7 +20,7 @@ import { colors, radius, spacing, typography } from "@/ui/tokens";
 
 export default function TodayScreen() {
   const router = useRouter();
-  const [role, setRole] = useState<UserRole | null>(null);
+  const [role, setRole] = useState<UserRole | null>(() => getCachedUserRole());
   const [records, setRecords] = useState<AppCycleLog[]>([]);
   const [summarySource, setSummarySource] = useState<CycleSummarySource>("self");
   const [user, setUser] = useState<User | null>(null);

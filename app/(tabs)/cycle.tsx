@@ -9,14 +9,34 @@ import { formatRecordDetail, formatRecordTitle, getRecordOption, getRecordOption
 import type { UserRole } from "@/domain/userRole";
 import { getRoleContent } from "@/domain/userRole";
 import { addCycleRecord, loadCycleRecords, removeCycleRecord } from "@/services/recordStore";
-import { getUserRole, subscribeUserRole } from "@/services/userRolePreference";
+import { getCachedUserRole, getUserRole, subscribeUserRole } from "@/services/userRolePreference";
 import { Screen } from "@/ui/Screen";
 import { colors, radius, spacing, typography } from "@/ui/tokens";
 
+const KNOWN_RECORD_KINDS: ReadonlySet<RecordKind> = new Set([
+  "period",
+  "temperature",
+  "ovulation_test",
+  "symptom",
+  "intercourse",
+  "supplement",
+  "sleep",
+  "exercise",
+  "alcohol",
+  "stress",
+  "heat"
+]);
+
 export default function CycleScreen() {
   const params = useLocalSearchParams<{ recordKind?: string }>();
-  const [role, setRole] = useState<UserRole | null>("female");
-  const [selectedKind, setSelectedKind] = useState<RecordKind>("ovulation_test");
+  const [role, setRole] = useState<UserRole | null>(() => getCachedUserRole() ?? "female");
+  const [selectedKind, setSelectedKind] = useState<RecordKind>(() => {
+    const requested = params.recordKind;
+    if (typeof requested === "string" && KNOWN_RECORD_KINDS.has(requested as RecordKind)) {
+      return requested as RecordKind;
+    }
+    return getRecommendedKind(getCachedUserRole() ?? "female");
+  });
   const [selectedValue, setSelectedValue] = useState("");
   const [note, setNote] = useState("");
   const [records, setRecords] = useState<AppCycleLog[]>([]);
