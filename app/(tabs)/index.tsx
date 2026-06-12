@@ -187,11 +187,13 @@ export default function TodayScreen() {
 
         <View style={styles.coachCard}>
           <View style={styles.coachHeader}>
-            <View>
+            <View style={styles.coachHeaderText}>
               <Text style={styles.coachTitle}>{content.role === "male" ? "AI 备孕搭档" : "AI 备孕助手"}</Text>
               <Text style={styles.coachBody}>聊聊今天要注意的，或者帮你回顾最近的记录。</Text>
             </View>
-            <Ionicons name="chatbubble-ellipses-outline" color={colors.sage} size={24} />
+            <View style={styles.coachIconBadge}>
+              <Ionicons name="chatbubble-ellipses-outline" color={colors.sage} size={20} />
+            </View>
           </View>
           <View style={styles.promptList}>
             {homeModel.prompts.map((prompt) => (
@@ -384,8 +386,20 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     flexDirection: "row",
     gap: spacing.md,
-    justifyContent: "space-between",
     marginBottom: spacing.md
+  },
+  coachHeaderText: {
+    flex: 1
+  },
+  coachIconBadge: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.sage,
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 36,
+    justifyContent: "center",
+    width: 36
   },
   coachTitle: {
     color: colors.ink,
@@ -395,8 +409,7 @@ const styles = StyleSheet.create({
   },
   coachBody: {
     ...typography.body,
-    color: colors.text,
-    maxWidth: 260
+    color: colors.text
   },
   promptList: {
     gap: 8
