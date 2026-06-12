@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import type { User } from "@supabase/supabase-js";
-import { computeCycleSummary, getFemalePhaseRelevance, type ComputedCycleSummary, type CyclePhase } from "@/domain/cycle";
+import { computeCycleSummary, getFemaleRecordVisibility, type ComputedCycleSummary, type CyclePhase } from "@/domain/cycle";
 import { formatDate } from "@/domain/date";
 import type { AppCycleLog, RecordKind, RecordOption } from "@/domain/records";
 import { getRecordOption, getRecordOptions } from "@/domain/records";
@@ -102,7 +102,7 @@ export default function TodayScreen() {
   const homeModel = getHomeModel(content.role);
   const phaseKinds =
     content.role === "female" && cycleSummary
-      ? getFemalePhaseRelevance(cycleSummary.phase).visible
+      ? getFemaleRecordVisibility(cycleSummary).visible
       : null;
   const effectiveQuickKinds = phaseKinds ? phaseKinds.slice(0, 4) : homeModel.quickKinds;
   const primaryKind = phaseKinds?.[0] ?? homeModel.primaryKind;

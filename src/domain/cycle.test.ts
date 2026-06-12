@@ -4,9 +4,10 @@ import {
   estimateCycle,
   formatCycleDayLabel,
   formatFertileWindow,
-  getFemalePhaseRelevance,
+  getFemaleRecordVisibility,
   getTodayTasks,
-  inferCycleAverages
+  inferCycleAverages,
+  type ComputedCycleSummary
 } from "./cycle";
 import type { AppCycleLog } from "./records";
 
@@ -104,18 +105,34 @@ describe("cycle domain", () => {
     ).toBe("6月6日-6月11日");
   });
 
-  it("hides ovulation tests during the period and period flow outside of it", () => {
-    const periodRelevance = getFemalePhaseRelevance("period");
-    expect(periodRelevance.primary).toBe("period");
-    expect(periodRelevance.visible).not.toContain("ovulation_test");
+  it("uses buffered visibility so a short-then-long cycle doesn't hide records prematurely", () => {
+    // Cycle day 2 — peak period: LH meaningless, period flow primary.
+    const day2 = makeSummary({ cycleDay: 2, phase: "period" });
+    const day2Rel = getFemaleRecordVisibility(day2);
+    expect(day2Rel.primary).toBe("period");
+    expect(day2Rel.visible).not.toContain("ovulation_test");
 
-    const fertileRelevance = getFemalePhaseRelevance("fertile");
-    expect(fertileRelevance.primary).toBe("ovulation_test");
-    expect(fertileRelevance.visible).not.toContain("period");
+    // Cycle day 6 — bleed officially over (avg 5 days) but we keep period
+    // visible for two more days in case this cycle is heavier than usual.
+    const day6 = makeSummary({ cycleDay: 6, phase: "follicular" });
+    const day6Rel = getFemaleRecordVisibility(day6);
+    expect(day6Rel.primary).toBe("temperature");
+    expect(day6Rel.visible).toContain("period");
+    expect(day6Rel.visible).toContain("ovulation_test");
 
-    const lutealRelevance = getFemalePhaseRelevance("luteal");
-    expect(lutealRelevance.visible).not.toContain("period");
-    expect(lutealRelevance.visible).not.toContain("ovulation_test");
+    // Cycle day 12 — fertile window, period not plausible anywhere near here.
+    const day12 = makeSummary({ cycleDay: 12, phase: "fertile-soon" });
+    const day12Rel = getFemaleRecordVisibility(day12);
+    expect(day12Rel.primary).toBe("ovulation_test");
+    expect(day12Rel.visible).not.toContain("period");
+
+    // Cycle day 25 — late luteal, next period expected day 29; period flow
+    // should reappear so an early arrival can still be logged.
+    const day25 = makeSummary({ cycleDay: 25, phase: "luteal" });
+    const day25Rel = getFemaleRecordVisibility(day25);
+    expect(day25Rel.primary).toBe("symptom");
+    expect(day25Rel.visible).toContain("period");
+    expect(day25Rel.visible).not.toContain("ovulation_test");
   });
 
   it("prioritizes LH and temperature tasks around the fertile window", () => {
@@ -142,6 +159,20 @@ function makePeriodRecord(happenedOn: string, localId: string): AppCycleLog {
     payload: { kind: "period", label: "经期", value: "中等", note: "" },
     clientUpdatedAt: `${happenedOn}T00:00:00.000Z`,
     syncStatus: "synced"
+  };
+}
+
+function makeSummary(overrides: Partial<ComputedCycleSummary> & { cycleDay: number; phase: ComputedCycleSummary["phase"] }): ComputedCycleSummary {
+  return {
+    cycleDay: overrides.cycleDay,
+    phase: overrides.phase,
+    fertileWindow: overrides.fertileWindow ?? { startsOn: "2026-06-06", peaksOn: "2026-06-10", endsOn: "2026-06-11" },
+    fertileWindowLabel: overrides.fertileWindowLabel ?? "6月6日-6月11日",
+    recentSymptoms: overrides.recentSymptoms ?? [],
+    latestPeriodStart: overrides.latestPeriodStart ?? "2026-05-25",
+    averageCycleLength: overrides.averageCycleLength ?? 29,
+    averagePeriodLength: overrides.averagePeriodLength ?? 5,
+    sampleCycles: overrides.sampleCycles ?? 3
   };
 }
 

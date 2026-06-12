@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { computeCycleSummary, getFemalePhaseRelevance } from "@/domain/cycle";
+import { computeCycleSummary, getFemaleRecordVisibility } from "@/domain/cycle";
 import { formatDate } from "@/domain/date";
 import type { AppCycleLog, RecordKind } from "@/domain/records";
 import { formatRecordDetail, formatRecordTitle, getRecordOption, getRecordOptions } from "@/domain/records";
@@ -30,7 +30,7 @@ export default function CycleScreen() {
     [activeRole, records, today]
   );
   const phaseRelevance = useMemo(
-    () => (activeRole === "female" && cycleSummary ? getFemalePhaseRelevance(cycleSummary.phase) : null),
+    () => (activeRole === "female" && cycleSummary ? getFemaleRecordVisibility(cycleSummary) : null),
     [activeRole, cycleSummary]
   );
   const recordOptions = useMemo(() => {

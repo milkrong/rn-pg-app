@@ -63,25 +63,70 @@ export function formatCycleDayLabel(cycleDay: number): string {
 }
 
 /**
- * Female-only: orders the record kinds that are meaningful in each cycle phase.
- * Anything not listed in `visible` is hidden because logging it during that
- * phase doesn't make biological sense (e.g. LH testing during a period, or
- * logging period flow when she's not bleeding).
+ * Female-only: decides which record kinds to surface today, ordered by how
+ * relevant each one is for the current phase. Cycle length varies month to
+ * month so visibility is computed with buffers, not hard phase boundaries:
+ *
+ *   - period flow: visible during the first {avgPeriod + 2} days (in case it
+ *     runs longer than usual) AND during the last 4 days of the cycle (in
+ *     case the next period arrives early).
+ *   - ovulation test: visible from cycle day 3 (after the heavy bleed days
+ *     when LH is suppressed) through {estimatedOvulationDay + 4} (in case
+ *     she ovulates late).
+ *   - temperature / symptom / intercourse / supplement: always visible.
  */
-export function getFemalePhaseRelevance(phase: CyclePhase): {
+export function getFemaleRecordVisibility(summary: ComputedCycleSummary): {
   visible: RecordKind[];
   primary: RecordKind;
 } {
-  const visible = FEMALE_PHASE_RECORD_ORDER[phase];
-  return { visible, primary: visible[0] };
+  const order = FEMALE_PHASE_RECORD_ORDER[summary.phase];
+  const visible = order.filter((kind) => isKindVisible(kind, summary));
+  const primary = visible[0] ?? order[0];
+  return { visible, primary };
 }
 
+function isKindVisible(kind: RecordKind, summary: ComputedCycleSummary): boolean {
+  const { cycleDay, averagePeriodLength, averageCycleLength } = summary;
+
+  if (kind === "period") {
+    const inEarlyBuffer = cycleDay <= averagePeriodLength + PERIOD_END_BUFFER_DAYS;
+    const inLateBuffer = cycleDay >= averageCycleLength - PERIOD_EARLY_ARRIVAL_DAYS;
+    return inEarlyBuffer || inLateBuffer;
+  }
+
+  if (kind === "ovulation_test") {
+    const estimatedOvulationCycleDay = Math.max(8, averageCycleLength - LUTEAL_PHASE_LENGTH);
+    const afterPeriodBleed = cycleDay >= OVULATION_TEST_EARLIEST_DAY;
+    const beforeLateLuteal = cycleDay <= estimatedOvulationCycleDay + OVULATION_LATE_BUFFER_DAYS;
+    return afterPeriodBleed && beforeLateLuteal;
+  }
+
+  return true;
+}
+
+/** Days past the estimated end of bleed that we still show the period record. */
+const PERIOD_END_BUFFER_DAYS = 2;
+/** Days before the estimated next period that we re-show the period record. */
+const PERIOD_EARLY_ARRIVAL_DAYS = 4;
+/** Earliest cycle day on which an LH test result is meaningful. */
+const OVULATION_TEST_EARLIEST_DAY = 3;
+/** Days past the estimated ovulation that we still keep the LH option around. */
+const OVULATION_LATE_BUFFER_DAYS = 4;
+/** Typical luteal-phase length (used to estimate ovulation day). */
+const LUTEAL_PHASE_LENGTH = 13;
+
+/**
+ * Per-phase ordering of every record kind. Visibility filtering above decides
+ * which ones actually appear, but when an ambiguous kind (period flow,
+ * ovulation test) is in its buffer window it slots in at the tail rather than
+ * pushing the phase's primary record off the top.
+ */
 const FEMALE_PHASE_RECORD_ORDER: Record<CyclePhase, RecordKind[]> = {
-  period: ["period", "symptom", "temperature", "intercourse", "supplement"],
-  follicular: ["temperature", "symptom", "intercourse", "ovulation_test", "supplement"],
-  "fertile-soon": ["ovulation_test", "temperature", "intercourse", "symptom", "supplement"],
-  fertile: ["ovulation_test", "intercourse", "temperature", "symptom", "supplement"],
-  luteal: ["symptom", "temperature", "intercourse", "supplement"]
+  period: ["period", "symptom", "temperature", "intercourse", "supplement", "ovulation_test"],
+  follicular: ["temperature", "symptom", "intercourse", "ovulation_test", "supplement", "period"],
+  "fertile-soon": ["ovulation_test", "temperature", "intercourse", "symptom", "supplement", "period"],
+  fertile: ["ovulation_test", "intercourse", "temperature", "symptom", "supplement", "period"],
+  luteal: ["symptom", "temperature", "intercourse", "supplement", "period", "ovulation_test"]
 };
 
 export type ComputedCycleSummary = {
